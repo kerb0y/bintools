@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>Rust 中的 From 和 Into trait - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>Rust 中的 From 和 Into trait</h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/rust/#rust">rust</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>Rust 中 From trait 定义一个类型如何转换为另一个类型的过程，还有些类似于构造函数。比如最常见的可以将 str 转换为 String</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">let</span> my_str = <span class="string">"hello"</span>;</span><br><span class="line"><span class="keyword">let</span> my_string = <span class="built_in">String</span>::from(my_str);</span><br></pre></td></tr></table></figure>
+
+<p>再比如将一个原始 i32 数字转化为 Number 类型</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> std::convert::<span class="built_in">From</span>;</span><br><span class="line"></span><br><span class="line"><span class="meta">#[derive(Debug)]</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Number</span></span> &#123;</span><br><span class="line">    value: <span class="built_in">i32</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">impl</span> <span class="built_in">From</span>&lt;<span class="built_in">i32</span>&gt; <span class="keyword">for</span> Number &#123;</span><br><span class="line">    <span class="function"><span class="keyword">fn</span> <span class="title">from</span></span>(item: <span class="built_in">i32</span>) -&gt; <span class="keyword">Self</span> &#123;</span><br><span class="line">        Number &#123; value: item &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">fn</span> <span class="title">main</span></span>() &#123;</span><br><span class="line">    <span class="keyword">let</span> num = Number::from(<span class="number">30</span>);</span><br><span class="line">    <span class="built_in">println!</span>(<span class="string">"My number is &#123;:?&#125;"</span>, num);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果一个类型实现了 From，那么也自动实现了 Into trait，Into 实际上是 From 的逆运算。由于类型可能有多个 From 实现，那么需要具体声明返回值类型。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">use</span> std::convert::<span class="built_in">From</span>;</span><br><span class="line"></span><br><span class="line"><span class="meta">#[derive(Debug)]</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Number</span></span> &#123;</span><br><span class="line">    value: <span class="built_in">i32</span>,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">impl</span> <span class="built_in">From</span>&lt;<span class="built_in">i32</span>&gt; <span class="keyword">for</span> Number &#123;</span><br><span class="line">    <span class="function"><span class="keyword">fn</span> <span class="title">from</span></span>(item: <span class="built_in">i32</span>) -&gt; <span class="keyword">Self</span> &#123;</span><br><span class="line">        Number &#123; value: item &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">fn</span> <span class="title">main</span></span>() &#123;</span><br><span class="line">    <span class="keyword">let</span> int = <span class="number">5</span>;</span><br><span class="line">    <span class="keyword">let</span> num: Number = int.into();</span><br><span class="line">    <span class="built_in">println!</span>(<span class="string">"My number is &#123;:?&#125;"</span>, num);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在密码学库中，也可以定义私钥到公钥的转换。如下所示，ed25519 的私钥生成中，从私钥获取公钥的过程直接由 <code>let pk: PublicKey = (&amp;sk).into();</code> 一步完成。</p>
+<p>具体实现则由 From trait 实现，这样让代码逻辑中的转换实现流程更清晰了。</p>
+<figure class="highlight rust"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/// An ed25519 keypair.</span></span><br><span class="line"><span class="meta">#[derive(Debug, Default)]</span> <span class="comment">// we derive Default in order to use the clear() method in Drop</span></span><br><span class="line"><span class="keyword">pub</span> <span class="class"><span class="keyword">struct</span> <span class="title">Keypair</span></span> &#123;</span><br><span class="line">    <span class="comment">/// The secret half of this keypair.</span></span><br><span class="line">    <span class="keyword">pub</span> secret: SecretKey,</span><br><span class="line">    <span class="comment">/// The public half of this keypair.</span></span><br><span class="line">    <span class="keyword">pub</span> public: PublicKey,</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">impl</span> KeyPair &#123;</span><br><span class="line">    <span class="keyword">pub</span> <span class="function"><span class="keyword">fn</span> <span class="title">generate</span></span>&lt;R&gt;(csprng: &amp;<span class="keyword">mut</span> R) -&gt; Keypair</span><br><span class="line">    <span class="keyword">where</span></span><br><span class="line">        R: CryptoRng + RngCore,</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">let</span> sk: SecretKey = SecretKey::generate(csprng);</span><br><span class="line">        <span class="keyword">let</span> pk: PublicKey = (&amp;sk).into();</span><br><span class="line"></span><br><span class="line">        Keypair&#123; public: pk, secret: sk &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// An EdDSA secret key.</span></span><br><span class="line"><span class="meta">#[derive(Default)]</span> <span class="comment">// we derive Default in order to use the clear() method in Drop</span></span><br><span class="line"><span class="keyword">pub</span> <span class="class"><span class="keyword">struct</span> <span class="title">SecretKey</span></span>(<span class="keyword">pub</span>(<span class="keyword">crate</span>) [<span class="built_in">u8</span>; SECRET_KEY_LENGTH]);</span><br><span class="line"></span><br><span class="line"><span class="keyword">impl</span> <span class="built_in">AsRef</span>&lt;[<span class="built_in">u8</span>]&gt; <span class="keyword">for</span> SecretKey &#123;</span><br><span class="line">    <span class="function"><span class="keyword">fn</span> <span class="title">as_ref</span></span>(&amp;<span class="keyword">self</span>) -&gt; &amp;[<span class="built_in">u8</span>] &#123;</span><br><span class="line">        <span class="keyword">self</span>.as_bytes()</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/// An ed25519 public key.</span></span><br><span class="line"><span class="meta">#[derive(Copy, Clone, Default, Eq, PartialEq)]</span></span><br><span class="line"><span class="keyword">pub</span> <span class="class"><span class="keyword">struct</span> <span class="title">PublicKey</span></span>(<span class="keyword">pub</span>(<span class="keyword">crate</span>) CompressedEdwardsY, <span class="keyword">pub</span>(<span class="keyword">crate</span>) EdwardsPoint);</span><br><span class="line"></span><br><span class="line"><span class="keyword">impl</span>&lt;<span class="symbol">'a</span>&gt; <span class="built_in">From</span>&lt;&amp;<span class="symbol">'a</span> SecretKey&gt; <span class="keyword">for</span> PublicKey &#123;</span><br><span class="line">    <span class="comment">/// Derive this public key from its corresponding `SecretKey`.</span></span><br><span class="line">    <span class="function"><span class="keyword">fn</span> <span class="title">from</span></span>(secret_key: &amp;SecretKey) -&gt; PublicKey &#123;</span><br><span class="line">        <span class="keyword">let</span> <span class="keyword">mut</span> h: Sha512 = Sha512::new();</span><br><span class="line">        <span class="keyword">let</span> <span class="keyword">mut</span> hash: [<span class="built_in">u8</span>; <span class="number">64</span>] = [<span class="number">0u8</span>; <span class="number">64</span>];</span><br><span class="line">        <span class="keyword">let</span> <span class="keyword">mut</span> digest: [<span class="built_in">u8</span>; <span class="number">32</span>] = [<span class="number">0u8</span>; <span class="number">32</span>];</span><br><span class="line"></span><br><span class="line">        h.input(secret_key.as_bytes());</span><br><span class="line">        hash.copy_from_slice(h.result().as_slice());</span><br><span class="line"></span><br><span class="line">        digest.copy_from_slice(&amp;hash[..<span class="number">32</span>]);</span><br><span class="line"></span><br><span class="line">        PublicKey::mangle_scalar_bits_and_multiply_by_basepoint_to_produce_public_key(&amp;<span class="keyword">mut</span> digest)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>代码引用地址：</p>
+<ol>
+<li><a href="https://doc.rust-lang.org/rust-by-example/conversion/from_into.html" target="_blank" rel="noopener">https://doc.rust-lang.org/rust-by-example/conversion/from_into.html</a></li>
+<li><a href="https://github.com/dalek-cryptography/ed25519-dalek/blob/master/src/secret.rs" target="_blank" rel="noopener">https://github.com/dalek-cryptography/ed25519-dalek/blob/master/src/secret.rs</a></li>
+</ol>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/rust/Rust-中的-From-和-Into-trait/ - Rust 中的 From 和 Into trait @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "Rust 中的 From 和 Into trait",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/p99延迟是什么/">p99延迟是什么?</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-Iterator-迭代器/">Rust Iterator 迭代器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-中的-From-和-Into-trait/">Rust 中的 From 和 Into trait</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/GET-请求可不可以附带-body？/">GET 请求可不可以附带 body？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-重入攻击和预防/">solidity 重入攻击和预防</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go中可比较性和有序性/">Go中可比较性和有序性</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/Solidity-v0-6-0-主要功能和破坏性更新示例/">Solidity v0.6.0 主要功能和破坏性更新示例</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go1-14-重要新特性/">Go1.14 重要新特性 </a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/解决macOS-Catalina-v10-15-无法编译c-扩展库的问题/">解决macOS Catalina (v10.15)无法编译c++扩展库的问题</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/crypto/基于x509的认证授权技术/">基于x509的认证授权技术</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

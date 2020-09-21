@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>age：一个现代化的加密工具 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>age：一个现代化的加密工具</h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/crypto/#crypto">crypto</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>age：一个现代化的加密工具</p>
+<p><a href="https://github.com/FiloSottile/age" target="_blank" rel="noopener">age</a> 是 golang crypto 库的维护者之一的 <a href="https://twitter.com/FiloSottile" target="_blank" rel="noopener">FiloSottile</a> 写的一个现代化加密工具，目前正处在 Beta 阶段。</p>
+<p>age 的是 Actual Good Encryption 的缩写，有点 PGP(Pretty Good Privacy) 的意思，说起来作者本身的想法就是<a href="https://twitter.com/filosottile/status/1127643698676797441" target="_blank" rel="noopener">想替代GnuPG</a>。</p>
+<p>age 的现代化体现在密码学算法的选择上，age 使用 x25519 作为非对称加密算法，x25519 是 Curve25519 被设计用于密钥交换的曲线，是目前公认的最快的椭圆密码曲线，它还有个用做签名的 ed25519 的兄弟，二者的公私钥可以<a href="https://libsodium.gitbook.io/doc/advanced/ed25519-curve25519" target="_blank" rel="noopener">互相转换</a>。</p>
+<p>对称加密算法选择上，age 使用 chacha20poly1305 ，现在已经是 TLS1.3 推荐对称加密算法，这个密码套件由两个算法构成：ChaCha20，一种流式密码，提供并行处理能力；以及用作认证加密(AEAD)的Poly1305。</p>
+<p>age 的密钥也就是 x25519 的密钥，密钥的格式使用比特币<a href="https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki" target="_blank" rel="noopener">bech32</a>方式存储，bech32 相比 base58 编码提供更小的空间占用和更快的校验方式。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="string">"filippo.io/age/internal/bech32"</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 在 age 中私钥的别称是 Identity</span></span><br><span class="line"><span class="keyword">type</span> X25519Identity <span class="keyword">struct</span> &#123;</span><br><span class="line">	secretKey, ourPublicKey []<span class="keyword">byte</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(i *X25519Identity)</span> <span class="title">String</span><span class="params">()</span> <span class="title">string</span></span> &#123;</span><br><span class="line">	s, _ := bech32.Encode(<span class="string">"AGE-SECRET-KEY-"</span>, i.secretKey)</span><br><span class="line">	<span class="keyword">return</span> strings.ToUpper(s)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(i *X25519Identity)</span> <span class="title">Recipient</span><span class="params">()</span> *<span class="title">X25519Recipient</span></span> &#123;</span><br><span class="line">	r := &amp;X25519Recipient&#123;&#125;</span><br><span class="line">	r.theirPublicKey = i.ourPublicKey</span><br><span class="line">	<span class="keyword">return</span> r</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 在 age 中公钥的别称是 Recipient</span></span><br><span class="line"><span class="keyword">type</span> X25519Recipient <span class="keyword">struct</span> &#123;</span><br><span class="line">	theirPublicKey []<span class="keyword">byte</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(r *X25519Recipient)</span> <span class="title">String</span><span class="params">()</span> <span class="title">string</span></span> &#123;</span><br><span class="line">	s, _ := bech32.Encode(<span class="string">"age"</span>, r.theirPublicKey)</span><br><span class="line">	<span class="keyword">return</span> s</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在命令行下只需要运行 <code>age-keygen</code> 即可生成一个新公私钥对：</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> age-keygen</span></span><br><span class="line"><span class="meta">#</span><span class="bash"> created: 2020-01-11T22:53:47+08:00</span></span><br><span class="line"><span class="meta">#</span><span class="bash"> public key: age1sr534qzh3q408qmzkeamu7qux3l544fwwyluneks9f2ljjvdgpqqcfrgny</span></span><br><span class="line">AGE-SECRET-KEY-1LTU2MHXLUJZDVANL949U694MH5PJ909KSQERSDE2TP3GTSRZSGYSNV3Y5N</span><br></pre></td></tr></table></figure>
+
+<p>在 x25519 下为了加密通常需要使用 ECDH，使用己方私钥和对方公钥计算出共享密钥，然后使用共享密钥密码进行加密。不过如果己方长期使用的私钥泄露，那么所有的历史消息都是有可能被破解的。为了保证前向安全，加密密钥，在 age 中称之为 fileKey，需要是临时生成的，只用做一次性加密。为了共享这个 filekey，可以使用 ECDH 共享密钥加密 filekey，那么接收方也能计算出共享密钥来得到真正加密密钥。加密 filekey 的这个操作称之为 Wrap，所以加密 fileKey 的加密密钥也称之为 wrappingKey。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// internal/age/x25519.go</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 己方密钥不参与加密流程</span></span><br><span class="line"><span class="comment">// 那么这里用作 ECDH 的 x25519 key 也需要是临时生成的</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 生成一对 x25519 临时私钥</span></span><br><span class="line">ephemeral := <span class="built_in">make</span>([]<span class="keyword">byte</span>, curve25519.ScalarSize)</span><br><span class="line"><span class="keyword">if</span> _, err := rand.Read(ephemeral); err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 根据私钥计算临时公钥</span></span><br><span class="line">ourPublicKey, err := curve25519.X25519(ephemeral, curve25519.Basepoint)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 计算 ECDH 共享密钥</span></span><br><span class="line"><span class="keyword">var</span> r *X25519Recipient</span><br><span class="line">sharedSecret, err := curve25519.X25519(ephemeral, r.theirPublicKey)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>临时公钥会放入加密内容中，这样接收方也能使用自己的私钥计算出真正的 wrappingKey。为了保证 wrappingKey 的随机性，这里的共享密钥不是 wrappingKey，需要做一次 HKDF 后得到。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// internal/age/x25519.go</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> x25519Label = <span class="string">"age-encryption.org/v1/X25519"</span></span><br><span class="line"></span><br><span class="line">salt := <span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">0</span>, <span class="built_in">len</span>(ourPublicKey)+<span class="built_in">len</span>(r.theirPublicKey))</span><br><span class="line"><span class="comment">// 使用我方临时公钥和对方公钥作为 HKDF 盐</span></span><br><span class="line">salt = <span class="built_in">append</span>(salt, ourPublicKey...)</span><br><span class="line">salt = <span class="built_in">append</span>(salt, r.theirPublicKey...)</span><br><span class="line"><span class="comment">// 使用 ECDH 公钥密钥 secret 材料生成最终的 filekey 加密密钥 wrappingKey</span></span><br><span class="line">h := hkdf.New(sha256.New, sharedSecret, salt, []<span class="keyword">byte</span>(x25519Label))</span><br><span class="line">wrappingKey := <span class="built_in">make</span>([]<span class="keyword">byte</span>, chacha20poly1305.KeySize)</span><br><span class="line"><span class="keyword">if</span> _, err := io.ReadFull(h, wrappingKey); err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>经过上述一系列的操作我们得到 wrappingKey，之后就可以对 fileKey 进行加密。aeadEncrypt 是加密 filekey 的方法，其中 nonce 选择固定的全零值，这里由于只是加密 fileKey，作者说为了不要过度设计，如果 nonce 是随机的，那么还需要另外途径放在加密内容内。加密后的 fileKey 我们称之为 wrappedKey。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// internal/age/primitives.go</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">aeadEncrypt</span><span class="params">(key, plaintext []<span class="keyword">byte</span>)</span> <span class="params">([]<span class="keyword">byte</span>, error)</span></span> &#123;</span><br><span class="line">	aead, err := chacha20poly1305.New(key)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">// The nonce is fixed because this function is only used in places where the</span></span><br><span class="line">	<span class="comment">// spec guarantees each key is only used once (by deriving it from values</span></span><br><span class="line">	<span class="comment">// that include fresh randomness), allowing us to save the overhead.</span></span><br><span class="line">	<span class="comment">// For the code that encrypts the actual payload, look at the</span></span><br><span class="line">	<span class="comment">// filippo.io/age/internal/stream package.</span></span><br><span class="line">	nonce := <span class="built_in">make</span>([]<span class="keyword">byte</span>, chacha20poly1305.NonceSize)</span><br><span class="line">	<span class="keyword">return</span> aead.Seal(<span class="literal">nil</span>, nonce, plaintext, <span class="literal">nil</span>), <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>为了保证消息完整性，还需要填充消息验证码。age 设计了一个类型 HTTP 的协议格式，先 header 后 body ，MAC 就放在 header 中。</p>
+<p>header 第一行为版本信息，现在固定为 <code>age-encryption.org/v1</code>；</p>
+<p>接下来是临时公钥信息，使用 <code>-&gt;</code> 开头字符串来标志，然后紧接着一个空格加上 Type 和 Args，对于 x25519 方式加密而言，Type 是 <code>X25519</code>，Args 是不带填充的 base64 编码的公钥信息，除了 x25519 ，age 还支持 RSA，scrypt，ed25519（间接转换为x25519）等加密方式。</p>
+<p>接下来是 wrappedKey ，也是进行 base64 进行编码，如果过长会进行换行。</p>
+<p>header 的最后是 footer，由 <code>---</code> 开头，至此是所有计算 HMAC 的内容，计算 MAC 后放入后面。如下所示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">age-encryption.org/v1</span><br><span class="line">-&gt; X25519 7hjWVZhiYlh0vvIOt+gvV4WDI2yLWsr+JOIoPBSSfVA</span><br><span class="line">bxtayTNuMQ+gdYgO7MaebFFTVj/SAwxWVNSCabITY64</span><br><span class="line">-&gt; X25519 BQ/dREFj+hbGVyxzSReDqtn15yVvAu5zqDyGa9cQxko</span><br><span class="line">MLWTEcNlj7LThMSZK4P4bkoWakUYjiOK7rYQ3Z6gUTw</span><br><span class="line">--- GGPEM7/pB9b3FpzJiym0t3wCnC7cQw/LgVjeilNkKl8</span><br></pre></td></tr></table></figure>
+
+<p>计算 MAC 是通过 HMAC-With-SHA256 进行，不对 body 进行 MAC 是因为我们使用 AEAD 加密内容，不需要额外的操作。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">headerMAC</span><span class="params">(fileKey []<span class="keyword">byte</span>, hdr *format.Header)</span> <span class="params">([]<span class="keyword">byte</span>, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">// 通过 filekey 计算 mac key</span></span><br><span class="line">	h := hkdf.New(sha256.New, fileKey, <span class="literal">nil</span>, []<span class="keyword">byte</span>(<span class="string">"header"</span>))</span><br><span class="line">	hmacKey := <span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">32</span>)</span><br><span class="line">	<span class="keyword">if</span> _, err := io.ReadFull(h, hmacKey); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	hh := hmac.New(sha256.New, hmacKey)</span><br><span class="line">	<span class="comment">// 下面这个过程是计算 header 的过程，内容参考上述 header 结构</span></span><br><span class="line">	<span class="keyword">if</span> err := hdr.MarshalWithoutMAC(hh); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> hh.Sum(<span class="literal">nil</span>), <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>body 是存放加密内容的地方。这里计算方式是 chacha20poly1305 的过程，为了得到最终的加密密钥，这里生成了同样 16 字节的 nonce，与 fileKey 进行 HKDF 混合后得到。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">streamKey</span><span class="params">(fileKey, nonce []<span class="keyword">byte</span>)</span> []<span class="title">byte</span></span> &#123;</span><br><span class="line">	h := hkdf.New(sha256.New, fileKey, nonce, []<span class="keyword">byte</span>(<span class="string">"payload"</span>))</span><br><span class="line">	streamKey := <span class="built_in">make</span>([]<span class="keyword">byte</span>, chacha20poly1305.KeySize)</span><br><span class="line">	<span class="keyword">if</span> _, err := io.ReadFull(h, streamKey); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="built_in">panic</span>(<span class="string">"age: internal error: failed to read from HKDF: "</span> + err.Error())</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> streamKey</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>body 先写入 nonce 后，后续使用流式方式加密并写入。</p>
+<p>这个就是 age x25519 的加密方式的所有内容，解密最重要的计算 filekey 的过程，这个上述有说过，这里不再赘述。(TODO：或许以后会写)</p>
+<p>命令行工具进行加解密也十分简单：</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> head -c 32 /dev/urandom | base64 &gt; plain.txt <span class="comment"># 生成一个文本并保存到 plain.txt</span></span></span><br><span class="line"><span class="meta">$</span><span class="bash"> age -r [RECIPIENT PUBKEY] -o cipher.txt plain.txt <span class="comment"># 加密 plain.txt 文件并保存到 cipher.txt</span></span></span><br><span class="line"><span class="meta">$</span><span class="bash"> age -i [IDENTITY PRVKEY] -o decrypt.txt -d cipher.txt <span class="comment"># 解密 cipher.txt 并保存到 decrypt.txt</span></span></span><br></pre></td></tr></table></figure>
+
+<p>age 加密也支持读取 stdin 数据：</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> tar cvz ~/data | age -r age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p &gt; data.tar.gz.age</span></span><br></pre></td></tr></table></figure>
+
+<p>也可以制定 -a 参数加密为 base64 格式数据：</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> age -r [RECIPIENT PUBKEY] -a -o cipher.txt plain.txt</span></span><br></pre></td></tr></table></figure>
+
+<p>如果要输出到 stdout 需要指定 <code>-</code> </p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> age -r [RECIPIENT PUBKEY] -a -o - plain.txt</span></span><br></pre></td></tr></table></figure>
+
+<p>总之 age 是个非常简单而且现代化的加密工具，但很遗憾的是，age只提供加解密，并不提供签名功能，加密流程也没有提供签名，只能可以在确认发送方身份时使用。</p>
+<h3 id="备注"><a href="#备注" class="headerlink" title="备注"></a>备注</h3><h4 id="Why-HKDF"><a href="#Why-HKDF" class="headerlink" title="Why HKDF"></a>Why HKDF</h4><p>HKDF 遵循“先提取后扩展”的模式，其中KDF逻辑上由两个模块组成。第一阶段采用输入密钥材料并从中“提取”固定长度的伪随机密钥K。第二阶段将密钥K“扩展”为多个附加的伪随机密钥（KDF的输出）。在许多应用中，输入密钥材料不一定均匀分布，攻击者可能对其有部分了解（例如，由密钥交换协议计算的Diffie-Hellman值），甚至对其有部分控制（如在一些熵收集应用中）。因此，“提取”阶段的目标是将输入密钥材料的可能分散的熵“集中”成一个短的、但加密性强的伪随机密钥。在某些应用中，输入可能已经是一个很好的伪随机密钥；在这些情况下，不需要“提取”阶段，“扩展”部分可以单独使用。第二阶段将伪随机密钥“扩展”到所需的长度；输出密钥的数量和长度取决于需要密钥的特定加密算法。<a href="https://tools.ietf.org/html/rfc5869#section-1" target="_blank" rel="noopener">RFC</a></p>
+<h4 id="Why-not-RSA"><a href="#Why-not-RSA" class="headerlink" title="Why not RSA"></a>Why not RSA</h4><p>RSA 仍被广泛使用，但是有个已知安全问题，<a href="https://golang.google.cn/pkg/crypto/rsa/#SignPKCS1v15" target="_blank" rel="noopener">PKCS#1.5签名密钥</a>也是<a href="https://golang.google.cn/pkg/crypto/rsa/#EncryptOAEP" target="_blank" rel="noopener">OAEP的加密密钥</a>。另外RSA的安全强度也不如椭圆曲线，3072位RSA密钥的加密强度才等同于256位的ECC密钥的水平。</p>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/crypto/age：一个现代化的加密工具/ - age：一个现代化的加密工具 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "age：一个现代化的加密工具",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/p99延迟是什么/">p99延迟是什么?</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-Iterator-迭代器/">Rust Iterator 迭代器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-中的-From-和-Into-trait/">Rust 中的 From 和 Into trait</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/GET-请求可不可以附带-body？/">GET 请求可不可以附带 body？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-重入攻击和预防/">solidity 重入攻击和预防</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go中可比较性和有序性/">Go中可比较性和有序性</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/Solidity-v0-6-0-主要功能和破坏性更新示例/">Solidity v0.6.0 主要功能和破坏性更新示例</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go1-14-重要新特性/">Go1.14 重要新特性 </a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/解决macOS-Catalina-v10-15-无法编译c-扩展库的问题/">解决macOS Catalina (v10.15)无法编译c++扩展库的问题</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/crypto/基于x509的认证授权技术/">基于x509的认证授权技术</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

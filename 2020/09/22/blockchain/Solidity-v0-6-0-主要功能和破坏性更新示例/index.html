@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>Solidity v0.6.0 主要功能和破坏性更新示例 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>Solidity v0.6.0 主要功能和破坏性更新示例</h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/blockchain/#blockchain">blockchain</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h2 id="重载关键字"><a href="#重载关键字" class="headerlink" title="重载关键字"></a>重载关键字</h2><p>和 C++ 中面向对象继承类似，Solidity 提供了 virtual 和 override 关键字。继承抽象合约或者合约接口需要加上 overide 关键字。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">abstract contract Feline &#123;</span><br><span class="line">    function utterance() public virtual returns (bytes32);</span><br><span class="line">    function running() public &#123;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">contract Cat is Feline &#123;</span><br><span class="line">    function utterance() public override returns (bytes32) &#123; return &quot;miaow&quot;; &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="回退函数更改"><a href="#回退函数更改" class="headerlink" title="回退函数更改"></a>回退函数更改</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">contract Wallet &#123;</span><br><span class="line">    // 5.0 中用于接收以太坊的回退函数</span><br><span class="line">    function () external payable &#123; &#125;</span><br><span class="line"></span><br><span class="line">    // 6.0 需要更改为这样</span><br><span class="line">    receive() external payable &#123;&#125;</span><br><span class="line"></span><br><span class="line">    // 或者这样，如不接收 ETH 则 payable 为可选</span><br><span class="line">    fallback() external payable &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="异常捕获"><a href="#异常捕获" class="headerlink" title="异常捕获"></a>异常捕获</h2><p>当进行外部非低级调用时，异常会冒泡到上层，v6.0 加入 try…catch 可以捕获到下层异常。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^0.6.0;</span><br><span class="line"></span><br><span class="line">interface DataFeed &#123; function getData(address token) external returns (uint value); &#125;</span><br><span class="line"></span><br><span class="line">contract FeedConsumer &#123;</span><br><span class="line">    DataFeed feed;</span><br><span class="line">    uint errorCount;</span><br><span class="line">    function rate(address token) public returns (uint value, bool success) &#123;</span><br><span class="line">        // Permanently disable the mechanism if there are</span><br><span class="line">        // more than 10 errors.</span><br><span class="line">        require(errorCount &lt; 10);</span><br><span class="line">        try feed.getData(token) returns (uint v) &#123;</span><br><span class="line">            return (v, true);</span><br><span class="line">        &#125; catch Error(string memory /*reason*/) &#123;</span><br><span class="line">            // This is executed in case</span><br><span class="line">            // revert was called inside getData</span><br><span class="line">            // and a reason string was provided.</span><br><span class="line">            errorCount++;</span><br><span class="line">            return (0, false);</span><br><span class="line">        &#125; catch (bytes memory /*lowLevelData*/) &#123;</span><br><span class="line">            // This is executed in case revert() was used</span><br><span class="line">            // or there was a failing assertion, division</span><br><span class="line">            // by zero, etc. inside getData.</span><br><span class="line">            errorCount++;</span><br><span class="line">            return (0, false);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>try 后接外部调用或者合约创建的表达式。当前版本仅支持 string 的错误类型，后续会增加更多错误类型，具体可以参考 try…catch <a href="https://solidity.readthedocs.io/en/v0.6.0/control-structures.html#try-catch" target="_blank" rel="noopener">文档</a>。</p>
+<h2 id="其它更新"><a href="#其它更新" class="headerlink" title="其它更新"></a>其它更新</h2><ol>
+<li>array.push() 不再返回新长度</li>
+<li>增加数组容量不可使用 array.length++，需要改成 array.push()</li>
+<li>减少数组容量不可使用 array.length–，需要改成 array.pop()</li>
+<li>可以使用 payable(address) 强制转化 address 为 address payable</li>
+<li>struct 和 enum 可以在文件全局声明</li>
+<li>更多更新可以参考<a href="https://solidity.readthedocs.io/en/latest/060-breaking-changes.html" target="_blank" rel="noopener">文档</a>或者<a href="https://github.com/ethereum/solidity/releases/tag/v0.6.0" target="_blank" rel="noopener">changelog</a></li>
+</ol>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/blockchain/Solidity-v0-6-0-主要功能和破坏性更新示例/ - Solidity v0.6.0 主要功能和破坏性更新示例 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "Solidity v0.6.0 主要功能和破坏性更新示例",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/p99延迟是什么/">p99延迟是什么?</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-Iterator-迭代器/">Rust Iterator 迭代器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-中的-From-和-Into-trait/">Rust 中的 From 和 Into trait</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/GET-请求可不可以附带-body？/">GET 请求可不可以附带 body？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-重入攻击和预防/">solidity 重入攻击和预防</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go中可比较性和有序性/">Go中可比较性和有序性</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/Solidity-v0-6-0-主要功能和破坏性更新示例/">Solidity v0.6.0 主要功能和破坏性更新示例</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go1-14-重要新特性/">Go1.14 重要新特性 </a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/解决macOS-Catalina-v10-15-无法编译c-扩展库的问题/">解决macOS Catalina (v10.15)无法编译c++扩展库的问题</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/crypto/基于x509的认证授权技术/">基于x509的认证授权技术</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>基于x509的认证授权技术 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>基于x509的认证授权技术</h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/crypto/#crypto">crypto</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>认证方式有很多，比如使用用户名密码的BasicAuth，使用 AccessToken 的 OAuth 2.0 等等，还有一个这篇文章要写的基于 X509 的认证方式，这个不太常见，目前我就在<a href="https://kubernetes.io/docs/reference/access-authn-authz/authentication/#x509-client-certs" target="_blank" rel="noopener">k8s api server</a>中见到。</p>
+<p>认证的本质就是获取并确定请求方的身份。回想一下在 TLS 中确认身份的情况，在握手中服务端要返回给客户端证书，客户端要检验服务端提供的证书合法性，校验通过后再进行通信。</p>
+<p>大多数的使用场景都是客户端检验服务端证书，但是有没有服务端要求校验客户端证书的？有，并且是<a href="https://tools.ietf.org/html/rfc5246#section-7.4.6" target="_blank" rel="noopener">TLS 标准</a>，所以基于此我们就可以实现基于 X509 的认证方式。</p>
+<p>这就比一般的 TLS 握手多了一个过程，服务端要求客户端必须提供证书并进行校验，校验通过再进行之后的握手，这个互相认证的流程也叫做 mTLS。</p>
+<p>在 x509 v3 证书中有一个 ExtKeyUsage 字段，是一个数组，按照最小授权权限原则，对于 Server 而言，这里可以选择服务端认证，而 Client 选择客户端认证即可。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> (</span><br><span class="line">    ExtKeyUsageAny ExtKeyUsage = <span class="literal">iota</span></span><br><span class="line">    ExtKeyUsageServerAuth <span class="comment">// 服务端认证</span></span><br><span class="line">    ExtKeyUsageClientAuth <span class="comment">// 客户端认证</span></span><br><span class="line">    <span class="comment">// .... 这里省略其它扩展选项</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>这种方式在内网中使用极为方便，如果我们要求访问认证有过期时间，那么也不需要在数据库系统中记录过期时间，只要颁发的证书设置 NotAfter 字段即可。</p>
+<p>至此，我们保证通信两端都是信任CA颁发的。不过还需要获取证书端的具体身份信息，这个在证书内也有提供。</p>
+<p>证书内提供了国家、地区、组织、通用名称等字段，这个就可以用作授权的身份信息。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Name <span class="keyword">struct</span> &#123;</span><br><span class="line">    Country, Organization, OrganizationalUnit []<span class="keyword">string</span></span><br><span class="line">    Locality, Province                        []<span class="keyword">string</span></span><br><span class="line">    StreetAddress, PostalCode                 []<span class="keyword">string</span></span><br><span class="line">    SerialNumber, CommonName                  <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line">    Names      []AttributeTypeAndValue</span><br><span class="line">    ExtraNames []AttributeTypeAndValue <span class="comment">// Go 1.5</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里 CommonName 通用名称可以视作用户身份标识符，Organization 组织名称可以视作用户组。通常情况使用这两个字段进行授权操作就足够了，一般很多场景都只需要使用 CommonName 就可以了。</p>
+<p>这就要求颁发证书需要保证这两个字段的正确性，以及通用名称字段的唯一性。所以如果是高安全等级的场景可以在证书颁发的时候加入人工审核环节。</p>
+<p>下面使用 Go 实现双向认证，服务端需要配置信任CA和要求客户端认证即可：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">server := http.Server&#123;</span><br><span class="line">    TLSConfig: &amp;tls.Config&#123;</span><br><span class="line">        ClientAuth:   tls.RequireAndVerifyClientCert, <span class="comment">// 客户端必须要提供证书</span></span><br><span class="line">        Certificates: []tls.Certificate&#123;&#125;,            <span class="comment">// 服务端证书</span></span><br><span class="line">        ClientCAs:    x509.NewCertPool(),             <span class="comment">// 校验客户端证书的CA集合</span></span><br><span class="line">    &#125;,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个过程主要需要配置是客户端，不过也很简单：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">httpclient := &amp;http.Client&#123;</span><br><span class="line">	Transport: &amp;http.Transport&#123;</span><br><span class="line">		TLSClientConfig: &amp;tls.Config&#123;</span><br><span class="line">			Certificates: []tls.Certificate&#123;&#125;, <span class="comment">// 客户端证书</span></span><br><span class="line">			RootCAs:      x509.NewCertPool(),  <span class="comment">// 校验服务端证书CA集合</span></span><br><span class="line">		&#125;,</span><br><span class="line">	&#125;,</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">req, _ := http.NewRequest(http.MethodGet, <span class="string">"https://localhost:8443/anycall"</span>, <span class="literal">nil</span>)</span><br><span class="line">resp, err := httpclient.Do(req)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">	<span class="built_in">panic</span>(err)</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">defer</span> resp.Body.Close()</span><br><span class="line">_, _ = io.Copy(os.StdOut, resp.body)</span><br></pre></td></tr></table></figure>
+
+<p>这样通信过程认证过程就可以在底层 TLS 握手时进行，服务端应用层“可以不再”需要进行任何配置。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 授权方式示例</span></span><br><span class="line">http.HandleFunc(<span class="string">"/anycall"</span>, <span class="function"><span class="keyword">func</span><span class="params">(w http.ResponseWriter, req *http.Request)</span></span> &#123;</span><br><span class="line">    commonName := req.TLS.PeerCertificates[<span class="number">0</span>].Subject.CommonName</span><br><span class="line">    <span class="keyword">if</span> commonName != <span class="string">"客户端通用名称"</span> &#123;</span><br><span class="line">        w.WriteHeader(http.StatusForbidden)</span><br><span class="line">        _, _ = w.Write([]<span class="keyword">byte</span>(<span class="string">"权限不足"</span>))</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    _, _ = w.Write([]<span class="keyword">byte</span>(<span class="string">"get success"</span>))</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<p>不过如果CA被恶意的重复颁发一个相同通用名称的证书，就会造成服务端错误的识别证书，不过可以用证书指纹判断是否与配置数据一致。</p>
+<p>这样也造成了一定的麻烦，需要颁发证书就得修改。这个过程适用于特别特别注重安全的场景使用。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">http.HandleFunc(<span class="string">"/anycall"</span>, <span class="function"><span class="keyword">func</span><span class="params">(w http.ResponseWriter, req *http.Request)</span></span> &#123;</span><br><span class="line">    clientCertificate := req.TLS.PeerCertificates[<span class="number">0</span>]</span><br><span class="line">    commonName := clientCertificate.Subject.CommonName</span><br><span class="line">    <span class="keyword">if</span> commonName != <span class="string">"客户端通用名称"</span> &#123;</span><br><span class="line">        w.WriteHeader(http.StatusForbidden)</span><br><span class="line">        _, _ = w.Write([]<span class="keyword">byte</span>(<span class="string">"权限不足"</span>))</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 多加一次证书指纹判断，另外错误的颁发证书应该进行报警</span></span><br><span class="line">    hash := sha256.Sum256(clientCertificate.Raw)</span><br><span class="line">    <span class="keyword">if</span> !hmac.Equal(hash[:], []<span class="keyword">byte</span>(<span class="string">"HASH_AT_PRE_CONFIG"</span>)) &#123;</span><br><span class="line">        _, _ = w.Write([]<span class="keyword">byte</span>(<span class="string">"无法匹配证书"</span>))</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    _, _ = w.Write([]<span class="keyword">byte</span>(<span class="string">"get success"</span>))</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<p>当然客户端也可以验证服务端证书指纹，不过这个有个专有名称叫做 <a href="https://en.wikipedia.org/wiki/HTTP_Public_Key_Pinning" target="_blank" rel="noopener">HTTP Public Key Pinning (HPKP)</a>。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">httpclient := &amp;http.Client&#123;</span><br><span class="line">    Transport: &amp;http.Transport&#123;</span><br><span class="line">        Dial: <span class="function"><span class="keyword">func</span><span class="params">(network, addr <span class="keyword">string</span>)</span> <span class="params">(net.Conn, error)</span></span> &#123;</span><br><span class="line">            <span class="comment">// 第三个参数 *tls.Cofnig 按照上文说明填写</span></span><br><span class="line">            c, err := tls.Dial(network, addr, YOUR_TLS_CONFIG)</span><br><span class="line">            <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="comment">// 获取HPKP并校验，视情况可只验证第一个的证书，而不是所有的证书链中所有证书</span></span><br><span class="line">            <span class="keyword">var</span> hasOne <span class="keyword">bool</span></span><br><span class="line">            <span class="keyword">for</span> _, certificate := <span class="keyword">range</span> c.ConnectionState().PeerCertificates &#123;</span><br><span class="line">                hash := sha256.Sum256(certificate.Raw)</span><br><span class="line">                <span class="keyword">if</span> hmac.Equal(hash[:], []<span class="keyword">byte</span>(<span class="literal">nil</span>)) &#123;</span><br><span class="line">                    hasOne = <span class="literal">true</span></span><br><span class="line">                    <span class="keyword">break</span></span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> !hasOne &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="literal">nil</span>, errors.New(<span class="string">"hpkp verifies failed"</span>)</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">return</span> c, <span class="literal">nil</span></span><br><span class="line">        &#125;,</span><br><span class="line">    &#125;,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>更具体的授权操作可以根据 RBAC 形式进行，这个和传统流程一致，就不再赘述。</p>
+<p>如果你正在使用 gRPC，我写了一个 go-example，可以参考这个<a href="https://github.com/islishude/grpc-mtls-example" target="_blank" rel="noopener">项目</a>。</p>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/crypto/基于x509的认证授权技术/ - 基于x509的认证授权技术 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "基于x509的认证授权技术",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/p99延迟是什么/">p99延迟是什么?</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-Iterator-迭代器/">Rust Iterator 迭代器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-中的-From-和-Into-trait/">Rust 中的 From 和 Into trait</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/GET-请求可不可以附带-body？/">GET 请求可不可以附带 body？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-重入攻击和预防/">solidity 重入攻击和预防</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go中可比较性和有序性/">Go中可比较性和有序性</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/Solidity-v0-6-0-主要功能和破坏性更新示例/">Solidity v0.6.0 主要功能和破坏性更新示例</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go1-14-重要新特性/">Go1.14 重要新特性 </a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/解决macOS-Catalina-v10-15-无法编译c-扩展库的问题/">解决macOS Catalina (v10.15)无法编译c++扩展库的问题</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/crypto/基于x509的认证授权技术/">基于x509的认证授权技术</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

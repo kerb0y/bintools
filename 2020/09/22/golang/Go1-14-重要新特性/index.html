@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>Go1.14 重要新特性  - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>Go1.14 重要新特性 </h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/Golang/#Golang">Golang</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h2 id="语言变更"><a href="#语言变更" class="headerlink" title="语言变更"></a>语言变更</h2><h3 id="内嵌接口方法集允许部分重叠"><a href="#内嵌接口方法集允许部分重叠" class="headerlink" title="内嵌接口方法集允许部分重叠"></a>内嵌接口方法集允许部分重叠</h3><p>接口（interface）是方法集合，方法必须有唯一的非空名称。</p>
+<blockquote>
+<p>之前的接口规范：一个接口 <code>T</code> 可以在方法集中使用接口 <code>E</code>，这里的 <code>E</code> 称之为 <code>T</code> 的内嵌接口，使得 <code>E</code> 中的所有公有和私有方法被添加到接口 <code>T</code> 中。</p>
+</blockquote>
+<p>所以如下所示的 ReadWriteCloser 多个内嵌接口拥有同名 Close 方法是不允许的。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> ReadWriteCloser <span class="keyword">interface</span> &#123;</span><br><span class="line">    io.ReadCloser</span><br><span class="line">    io.WriteCloser</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Go1.14 现在支持这种语法形式。</p>
+<blockquote>
+<p>现在的接口规范：一个接口 <code>T</code> 可以在方法集中使用接口 <code>E</code>，这里的 <code>E</code> 称之为 <code>T</code> 的内嵌接口，<code>T</code> 的方法集是 <code>T</code> 中明确声明的方法以及<code>T</code>内嵌接口中方法的结合。这个方法集包含所有公有和私有方法，同名的方法必须拥有相同的函数签名。</p>
+</blockquote>
+<p>以下为规范的示例：</p>
+<p>显式重复多次声明相同的方法依然是不被允许的</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> I <span class="keyword">interface</span> &#123;</span><br><span class="line">	m()</span><br><span class="line">	m()  <span class="comment">// 非法，m()已经显式声明</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在 Go1.14 之前是允许内嵌多个空接口</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> E <span class="keyword">interface</span> &#123;&#125;</span><br><span class="line"><span class="keyword">type</span> I <span class="keyword">interface</span> &#123; E; E &#125;  <span class="comment">// 总是合法</span></span><br></pre></td></tr></table></figure>
+
+<p>在 Go1.14 之后允许内嵌多个非空接口：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> E <span class="keyword">interface</span> &#123; m() &#125;</span><br><span class="line"><span class="keyword">type</span> I <span class="keyword">interface</span> &#123; E; E &#125;  <span class="comment">// 现已合法</span></span><br></pre></td></tr></table></figure>
+
+<p>如果不同的内嵌接口提供了同名方法，这些方法必须拥有相同的签名，否则就是非法的：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> E1 <span class="keyword">interface</span> &#123; m(x <span class="keyword">int</span>) <span class="keyword">bool</span> &#125;</span><br><span class="line"><span class="keyword">type</span> E2 <span class="keyword">interface</span> &#123; m(x <span class="keyword">float32</span>) <span class="keyword">bool</span> &#125;</span><br><span class="line"><span class="keyword">type</span> I  <span class="keyword">interface</span> &#123; E1; E2 &#125;  <span class="comment">// 非法：E1.m 和 E2.m 同名但是方法签名不同</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="Go命令变更"><a href="#Go命令变更" class="headerlink" title="Go命令变更"></a>Go命令变更</h2><h4 id="自动支持-vendor"><a href="#自动支持-vendor" class="headerlink" title="自动支持 vendor"></a>自动支持 vendor</h4><p>如果当前 main 包基目录下包含一个 vendor 目录，并且 go.mod 显式说明仅支持 go1.14 或更高版本，那么所有的 go 命令都会显式的加入 <code>-mod=vendor</code>。另外一个新的命令行参数 <code>-mod=mod</code>，在没有 vendor 目录的时候会从模块本地缓存中读取。</p>
+<p>当默认或者显式 <code>-mod=vendor</code> 的时候，go命令会校验 <code>vendor/modules.txt</code> 文件和 <code>go.mod</code> 声明的是一致的。</p>
+<h4 id="支持非TLS的私有仓库"><a href="#支持非TLS的私有仓库" class="headerlink" title="支持非TLS的私有仓库"></a>支持非TLS的私有仓库</h4><p>在很久之前可以使用 <code>go get -insecure</code> 下载非 TLS 的私有仓库包，但是 go module 后不支持这种方式。</p>
+<p>Go1.14现在支持声明环境变量的方式支持非安全连接的私有包，类似 GOPRIVATE 只需要定义逗号分割的 GOINSECURE 环境变量即可。</p>
+<h2 id="运行时变更"><a href="#运行时变更" class="headerlink" title="运行时变更"></a>运行时变更</h2><p>更快的 defer，而且是几乎零开销。现在 defer 可以在对性能至关重要的代码中使用，而无需担心新能开销。</p>
+<p>Go 协程现在可以异步抢占，减少调度程序死锁或延迟垃圾回收的可能性。</p>
+<p>timer 在调度中减少锁使用和上下文切换，性能提升明显。详情可以参考 《Go夜读 Go time.Timer 源码分析（Go1.14）》。</p>
+<h2 id="标准库变更"><a href="#标准库变更" class="headerlink" title="标准库变更"></a>标准库变更</h2><ol>
+<li>新包 hash/maphash 提供非密码学安全的哈希算法</li>
+<li>tls 移除 SSLv3 支持，TLS 1.3 默认开启</li>
+</ol>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/golang/Go1-14-重要新特性/ - Go1.14 重要新特性  @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "Go1.14 重要新特性 ",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/p99延迟是什么/">p99延迟是什么?</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-Iterator-迭代器/">Rust Iterator 迭代器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/rust/Rust-中的-From-和-Into-trait/">Rust 中的 From 和 Into trait</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/GET-请求可不可以附带-body？/">GET 请求可不可以附带 body？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-重入攻击和预防/">solidity 重入攻击和预防</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go中可比较性和有序性/">Go中可比较性和有序性</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/Solidity-v0-6-0-主要功能和破坏性更新示例/">Solidity v0.6.0 主要功能和破坏性更新示例</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go1-14-重要新特性/">Go1.14 重要新特性 </a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/解决macOS-Catalina-v10-15-无法编译c-扩展库的问题/">解决macOS Catalina (v10.15)无法编译c++扩展库的问题</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/crypto/基于x509的认证授权技术/">基于x509的认证授权技术</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+
