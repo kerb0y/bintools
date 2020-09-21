@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>solidity v0.5.0 主要破坏性更新示例 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>solidity v0.5.0 主要破坏性更新示例</h1>
+        
+        <h2 class="headline">Jan 30 2019
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h2 id="强制显式声明函数可见性"><a href="#强制显式声明函数可见性" class="headerlink" title="强制显式声明函数可见性"></a>强制显式声明函数可见性</h2><p>默认可见性声明被废弃，所有的函数和构造函数不再隐式声明 <code>public</code>，必须手动加上 <code>public</code>。而 <code>fallback</code> 和接口函数需要强制加上 <code>external</code>。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^0.5.3;</span><br><span class="line"></span><br><span class="line">interface example &#123;</span><br><span class="line">    function add(uint x, uint y) external pure returns (uint);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">contract Test is example &#123;</span><br><span class="line">    constructor() public &#123;&#125;</span><br><span class="line"></span><br><span class="line">    function() external payable &#123;&#125;</span><br><span class="line"></span><br><span class="line">    function add(uint x, uint y) public pure returns (uint) &#123;</span><br><span class="line">        uint z = x + y;</span><br><span class="line">        assert(z &gt;= x);</span><br><span class="line">        return z;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="强制显式指定复合型数据类型位置"><a href="#强制显式指定复合型数据类型位置" class="headerlink" title="强制显式指定复合型数据类型位置"></a>强制显式指定复合型数据类型位置</h2><p>结构体、数组、映射等复合型数据需要指定数据位置，包括函数参数和返回值。另外 <code>external</code> 函数中的需要将复合类型参数指定为 <code>calldata</code>.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">contract Test &#123;</span><br><span class="line">    uint256[] public data;</span><br><span class="line">    constructor(uint[] memory _data) public &#123;</span><br><span class="line">        data = _data;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    function create(bytes memory _data) public pure returns(bytes memory) &#123;</span><br><span class="line">        return _data;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">interface Example &#123;</span><br><span class="line">    function create(address _key, string calldata _value, bytes32 _hash) external;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="address-类型扩展"><a href="#address-类型扩展" class="headerlink" title="address 类型扩展"></a>address 类型扩展</h2><p>合约不再隐式转换成 address 类型，需要手动转换。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">contract Test &#123;</span><br><span class="line">    constructor() public &#123;&#125;</span><br><span class="line">    </span><br><span class="line">    function getBalance() public view returns (uint256) &#123;</span><br><span class="line">        return address(this).balance;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>address</code> 分为 <code>address</code> 和 <code>address payable</code> 两种类型，只有后者可以调用 <code>transfer</code> 方法。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^0.5.3;</span><br><span class="line"></span><br><span class="line">contract Test &#123;</span><br><span class="line">    address payable owner;</span><br><span class="line">    constructor() public &#123;</span><br><span class="line">        owner = msg.sender;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    function() external payable &#123;&#125;</span><br><span class="line">    </span><br><span class="line">    function transfer(address payable _to, uint _value) public &#123;</span><br><span class="line">        require(msg.sender == owner);</span><br><span class="line">        require(address(this).balance &gt;= _value);</span><br><span class="line">        _to.transfer(_value);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    function destroy() public &#123;</span><br><span class="line">        require(msg.sender == owner);</span><br><span class="line">        selfdestruct(owner);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="函数变更"><a href="#函数变更" class="headerlink" title="函数变更"></a>函数变更</h2><p>现在 <code>.call()</code> 合约调用函数和 <code>keccak256()</code> 哈希函数现在只接受一个 <code>bytes</code> 参数。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^0.5.3;</span><br><span class="line"></span><br><span class="line">contract Test &#123;</span><br><span class="line">    constructor() public &#123;&#125;</span><br><span class="line">    </span><br><span class="line">    function create(address _from,bytes memory _data) public view returns(bytes32) &#123;</span><br><span class="line">        bytes32 hash = keccak256(abi.encodePacked(address(this), _from, _data));</span><br><span class="line">        return hash;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>另外 <code>.call()</code> 等合约调用函数返回值除了调用状态外，还包括了返回值。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^0.5.3;</span><br><span class="line"></span><br><span class="line">contract Test &#123;</span><br><span class="line">    constructor() public &#123;&#125;</span><br><span class="line"></span><br><span class="line">    function callTest() public view returns(bytes32)&#123;</span><br><span class="line">        address con = address(0x0);</span><br><span class="line">        bytes memory params = abi.encodeWithSignature(&quot;create(address,bytes)&quot;);</span><br><span class="line">        (bool success, bytes memory result) = con.delegatecall(params);</span><br><span class="line">        // ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>以下函数正式被废弃：</p>
+<ul>
+<li><code>callcode</code> 被废弃，推荐使用 <code>delegatecall</code></li>
+<li><code>suicide</code> 被废弃，推荐使用 <code>selfdestruct</code></li>
+<li><code>sha3</code> 被废弃，推荐使用 <code>keccak256</code></li>
+</ul>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2019/01/30/blockchain/solidity-v0-5-0-主要破坏性更新示例/ - solidity v0.5.0 主要破坏性更新示例 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "solidity v0.5.0 主要破坏性更新示例",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

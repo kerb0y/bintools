@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>使用 Go 进行 Solidity ABI 编解码 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>使用 Go 进行 Solidity ABI 编解码</h1>
+        
+        <h2 class="headline">Jun 29 2019
+        
+            
+            <a href="/blog/categories/blockchain/#blockchain">blockchain</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h2 id="类型对应关系"><a href="#类型对应关系" class="headerlink" title="类型对应关系"></a>类型对应关系</h2><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>Solidity</th>
+<th>Go</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>字符串</td>
+<td>string</td>
+<td>string</td>
+</tr>
+<tr>
+<td>布尔</td>
+<td>bool</td>
+<td>bool</td>
+</tr>
+<tr>
+<td>地址</td>
+<td>address</td>
+<td>common.Address</td>
+</tr>
+<tr>
+<td>无符号整数</td>
+<td>uintN</td>
+<td>uintN 或 *big.Int</td>
+</tr>
+<tr>
+<td>有符号整数</td>
+<td>intN</td>
+<td>intN 或 *big.Int</td>
+</tr>
+<tr>
+<td>固定长度字节数组</td>
+<td>bytesN</td>
+<td>[N]byte</td>
+</tr>
+<tr>
+<td>动态长度字节数组</td>
+<td>bytes</td>
+<td>[]byte</td>
+</tr>
+<tr>
+<td>固定长度数组</td>
+<td>T[k]</td>
+<td>array</td>
+</tr>
+<tr>
+<td>动态长度数组</td>
+<td>T[]</td>
+<td>slice</td>
+</tr>
+<tr>
+<td>枚举</td>
+<td>enum</td>
+<td>uintN</td>
+</tr>
+<tr>
+<td>映射</td>
+<td>mapping</td>
+<td>-</td>
+</tr>
+<tr>
+<td>结构体</td>
+<td>struct</td>
+<td>-</td>
+</tr>
+</tbody></table>
+<p>备注：</p>
+<ul>
+<li>solidity 中 uintN 和 intN 类型如果和 go 内置类型名相同，那么就一一对应，否则就是 <code>*big.Int</code> 类型。比如说 Solidity <code>uint8</code> 对应 go 的 <code>uint8</code> 而 solidity 中 <code>uint256</code> 以及 <code>uint160</code> 等就对应 go <code>*big.Int</code> 类型</li>
+<li>固定长度数组对应相应类型数组，比如 Solidity <code>int[2]</code> 对应 go 的 <code>[2]int</code></li>
+<li>动态长度数组对应相应类型的切片，比如 Solidity 的 <code>int[]</code> 对应 go 的 <code>[]int</code></li>
+<li>枚举对应一个无符号的整数，具体根据枚举数量，一般为 <code>uint8</code> 类型</li>
+<li>mapping 只能使用 storage 存储类型，不能作为函数参数和函数作用域变量，只能用于状态变量</li>
+<li>struct 结构体 ABI 编解码目前处于实验阶段</li>
+</ul>
+<h2 id="使用示例"><a href="#使用示例" class="headerlink" title="使用示例"></a>使用示例</h2><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">	<span class="string">"encoding/json"</span></span><br><span class="line">	<span class="string">"fmt"</span></span><br><span class="line">	<span class="string">"math/big"</span></span><br><span class="line">	<span class="string">"os"</span></span><br><span class="line">	<span class="string">"strings"</span></span><br><span class="line"></span><br><span class="line">	<span class="string">"github.com/ethereum/go-ethereum/accounts/abi"</span></span><br><span class="line">	<span class="string">"github.com/ethereum/go-ethereum/common"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">pragma solidity ^0.6.0;</span></span><br><span class="line"><span class="comment"></span></span><br><span class="line"><span class="comment">interface ABI &#123;</span></span><br><span class="line"><span class="comment">    function List(address owner) external view returns (address[] memory receiver, uint256[] memory values);</span></span><br><span class="line"><span class="comment">    function Value(address owner) external view returns (uint256 values);</span></span><br><span class="line"><span class="comment">&#125;</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> RawABI = <span class="string">`[</span></span><br><span class="line"><span class="string">	&#123;</span></span><br><span class="line"><span class="string">		"inputs": [</span></span><br><span class="line"><span class="string">			&#123;</span></span><br><span class="line"><span class="string">				"internalType": "address",</span></span><br><span class="line"><span class="string">				"name": "owner",</span></span><br><span class="line"><span class="string">				"type": "address"</span></span><br><span class="line"><span class="string">			&#125;</span></span><br><span class="line"><span class="string">		],</span></span><br><span class="line"><span class="string">		"name": "List",</span></span><br><span class="line"><span class="string">		"outputs": [</span></span><br><span class="line"><span class="string">			&#123;</span></span><br><span class="line"><span class="string">				"internalType": "address[]",</span></span><br><span class="line"><span class="string">				"name": "receiver",</span></span><br><span class="line"><span class="string">				"type": "address[]"</span></span><br><span class="line"><span class="string">			&#125;,</span></span><br><span class="line"><span class="string">			&#123;</span></span><br><span class="line"><span class="string">				"internalType": "uint256[]",</span></span><br><span class="line"><span class="string">				"name": "values",</span></span><br><span class="line"><span class="string">				"type": "uint256[]"</span></span><br><span class="line"><span class="string">			&#125;</span></span><br><span class="line"><span class="string">		],</span></span><br><span class="line"><span class="string">		"stateMutability": "view",</span></span><br><span class="line"><span class="string">		"type": "function"</span></span><br><span class="line"><span class="string">	&#125;,</span></span><br><span class="line"><span class="string">	&#123;</span></span><br><span class="line"><span class="string">		"inputs": [</span></span><br><span class="line"><span class="string">			&#123;</span></span><br><span class="line"><span class="string">				"internalType": "address",</span></span><br><span class="line"><span class="string">				"name": "owner",</span></span><br><span class="line"><span class="string">				"type": "address"</span></span><br><span class="line"><span class="string">			&#125;</span></span><br><span class="line"><span class="string">		],</span></span><br><span class="line"><span class="string">		"name": "Value",</span></span><br><span class="line"><span class="string">		"outputs": [</span></span><br><span class="line"><span class="string">			&#123;</span></span><br><span class="line"><span class="string">				"internalType": "uint256",</span></span><br><span class="line"><span class="string">				"name": "values",</span></span><br><span class="line"><span class="string">				"type": "uint256"</span></span><br><span class="line"><span class="string">			&#125;</span></span><br><span class="line"><span class="string">		],</span></span><br><span class="line"><span class="string">		"stateMutability": "view",</span></span><br><span class="line"><span class="string">		"type": "function"</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string">]`</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">	parsed, err := abi.JSON(strings.NewReader(RawABI))</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="built_in">panic</span>(err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	&#123;</span><br><span class="line">		address := common.HexToAddress(<span class="string">"0x80819B3F30e9D77DE6BE3Df9d6EfaA88261DfF9c"</span>)</span><br><span class="line"></span><br><span class="line">		<span class="comment">// Value 参数编码</span></span><br><span class="line">		valueInput, err := parsed.Pack(<span class="string">"Value"</span>, address)</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="built_in">panic</span>(err)</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="comment">// Value 参数解码</span></span><br><span class="line">		<span class="keyword">var</span> addrwant common.Address</span><br><span class="line">		<span class="keyword">if</span> err := parsed.Methods[<span class="string">"Value"</span>].Inputs.Unpack(&amp;addrwant, valueInput[<span class="number">4</span>:]); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="built_in">panic</span>(err)</span><br><span class="line">		&#125;</span><br><span class="line">		fmt.Println(<span class="string">"should equals"</span>, addrwant == address)</span><br><span class="line"></span><br><span class="line">		<span class="comment">// Value 返回值解码</span></span><br><span class="line">		<span class="keyword">var</span> balance *big.Int</span><br><span class="line">		<span class="keyword">var</span> returns = common.Hex2Bytes(<span class="string">"0000000000000000000000000000000000000000000000000000000005f5e100"</span>)</span><br><span class="line">		<span class="keyword">if</span> err := parsed.Unpack(&amp;balance, <span class="string">"Value"</span>, returns); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="built_in">panic</span>(err)</span><br><span class="line">		&#125;</span><br><span class="line">		fmt.Println(<span class="string">"Value 返回值"</span>, balance)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// List 返回值编码</span></span><br><span class="line">	&#123;</span><br><span class="line">		<span class="comment">// 注意：字段名称需要与 ABI 编码的定义的一致</span></span><br><span class="line">		<span class="comment">// 比如，这里 ABI 编码返回值第一个为 receiver 那么转化为 Go 就是首字母大写的 Receiver</span></span><br><span class="line">		<span class="keyword">var</span> res <span class="keyword">struct</span> &#123;</span><br><span class="line">			Receiver []common.Address <span class="comment">// 返回值名称</span></span><br><span class="line">			Values   []*big.Int       <span class="comment">// 返回值名称</span></span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="comment">// &#123;"Receiver":["0x80819b3f30e9d77de6be3df9d6efaa88261dff9c"],"Values":[10]&#125;</span></span><br><span class="line">		raw := common.Hex2Bytes(<span class="string">"00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000080819b3f30e9d77de6be3df9d6efaa88261dff9c0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000a"</span>)</span><br><span class="line">		<span class="keyword">if</span> err := parsed.Unpack(&amp;res, <span class="string">"List"</span>, raw); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="built_in">panic</span>(err)</span><br><span class="line">		&#125;</span><br><span class="line">		_ = json.NewEncoder(os.Stdout).Encode(&amp;res)</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2019/06/29/blockchain/使用-Go-进行-Solidity-ABI-编解码/ - 使用 Go 进行 Solidity ABI 编解码 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "使用 Go 进行 Solidity ABI 编解码",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

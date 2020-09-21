@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>理解 Promise - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>理解 Promise</h1>
+        
+        <h2 class="headline">Jan 30 2019
+        
+            
+            <a href="/blog/categories/Node-js/#Node.js">Node.js</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h2 id="语法"><a href="#语法" class="headerlink" title="语法"></a>语法</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">new Promise(</span><br><span class="line">    /* executor */</span><br><span class="line">    function(resolve, reject) &#123;...&#125;</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<h3 id="参数"><a href="#参数" class="headerlink" title="参数"></a>参数</h3><p>executor是一个带有resolve和reject两个参数的函数 <strong>。executor 函数在Promise构造函数执行时同步执行</strong>，被传递resolve和reject函数（executor 函数在Promise构造函数返回新建对象前被调用）。resolve 和 reject 函数被调用时，分别将promise的状态改为fulfilled(完成)或rejected（失败）。executor 内部通常会执行一些异步操作，一旦完成，可以调用resolve函数来将promise状态改成fulfilled，或者在发生错误时将它的状态改为rejected。如果在executor函数中抛出一个错误，那么该promise 状态为rejected。executor函数的返回值被忽略。</p>
+<p>Promise 对象是一个代理对象（代理一个值），被代理的值在Promise对象创建时可能是未知的。它允许你为异步操作的成功和失败分别绑定相应的处理方法（handlers ）。 这让异步方法可以像同步方法那样返回值，但并不是立即返回最终执行结果，而是一个能代表未来出现的结果的promise对象</p>
+<p>一个 Promise有以下几种状态:</p>
+<ul>
+<li>pending: 初始状态，不是成功或失败状态。</li>
+<li>fulfilled: 意味着操作成功完成。</li>
+<li>rejected: 意味着操作失败。</li>
+</ul>
+<p>pending 状态的 Promise 对象可能触发fulfilled 状态并传递一个值给相应的状态处理方法，也可能触发失败状态（rejected）并传递失败信息。当其中任一种情况出现时，Promise 对象的 then 方法绑定的处理方法（handlers ）就会被调用（then方法包含两个参数：onfulfilled 和 onrejected，它们都是 Function 类型。当Promise状态为fulfilled时，调用 then 的 onfulfilled 方法，当Promise状态为rejected时，调用 then 的 onrejected 方法， 所以在异步操作的完成和绑定处理方法之间不存在竞争）。</p>
+<p>因为 Promise.prototype.then 和 Promise.prototype.catch 方法返回promise 对象， 所以它们可以被链式调用。</p>
+<p>Promise.then()会始终接收上一层Promise的返回值，使用 <code>resolve(value)</code> 或者 <code>return value</code> ，注意：在JS中无返回值的函数是返回的<code>underfined</code></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">// 有返回值，并且为1</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">func1</span>(<span class="params"></span>)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 无返回值</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">func2</span>(<span class="params"></span>)</span>&#123;</span><br><span class="line">   <span class="built_in">console</span>.log(<span class="number">2</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//无返回值</span></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">func3</span>(<span class="params"></span>)</span>&#123;</span><br><span class="line">   func1();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Promise.then()，接收一个参数，如果参数为函数才会<strong>上一个</strong>then与异步（即等待上一个Promise执行结束后再执行），如果参数返回的是Promise对象才会<strong>下一个t</strong>hen异步进行（即当前执行结束后才会执行下一个then）。</p>
+<p>在这些例子中，我假定 doSomething() 和 doSomethingElse() 均返回 promises，并且这些 promises 代表某些在 JavaScript event loop (如 IndexedDB, network, setTimeout) 之外的某些工作结束，这也是为何它们在某些时候表现起来像是并行执行的意义。这里是一个模拟用的 <a href="http://jsbin.com/tuqukakawo/1/edit?js,console,output" target="_blank" rel="noopener">JSBin</a>。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">doSomething().then(<span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> doSomethingElse();</span><br><span class="line">&#125;).then(finalHandler);</span><br></pre></td></tr></table></figure>
+
+<p><strong>Answer:</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">doSomething</span><br><span class="line">|-----------------|</span><br><span class="line">                  doSomethingElse(undefined)</span><br><span class="line">                  |------------------|</span><br><span class="line">                                     finalHandler(resultOfDoSomethingElse)</span><br><span class="line">                                     |------------------|</span><br></pre></td></tr></table></figure>
+
+<p><strong>Puzzle2</strong></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">doSomething().then(<span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</span><br><span class="line">  doSomethingElse();</span><br><span class="line">&#125;).then(finalHandler);</span><br></pre></td></tr></table></figure>
+
+<p><strong>Answer:</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">doSomething</span><br><span class="line">|-----------------|</span><br><span class="line">                  doSomethingElse(undefined)</span><br><span class="line">                  |------------------|</span><br><span class="line">                  finalHandler(undefined)</span><br><span class="line">                  |------------------|</span><br></pre></td></tr></table></figure>
+
+<p><strong>Puzzle3</strong></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">doSomething().then(doSomethingElse())</span><br><span class="line">  .then(finalHandler);</span><br></pre></td></tr></table></figure>
+
+<p><strong>Answer:</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">doSomething</span><br><span class="line">|-----------------|</span><br><span class="line">doSomethingElse(undefined)</span><br><span class="line">|---------------------------------|</span><br><span class="line">                  finalHandler(resultOfDoSomething)</span><br><span class="line">                  |------------------|</span><br></pre></td></tr></table></figure>
+
+<p><strong>Puzzle4</strong></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">doSomething().then(doSomethingElse)</span><br><span class="line">  .then(finalHandler);</span><br></pre></td></tr></table></figure>
+
+<p>Answer:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">doSomething</span><br><span class="line">|-----------------|</span><br><span class="line">                  doSomethingElse(resultOfDoSomething)</span><br><span class="line">                  |------------------|</span><br><span class="line">                                     finalHandler(resultOfDoSomethingElse)</span><br><span class="line">                                     |------------------|</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise" target="_blank" rel="noopener">MND-Promise</a></li>
+<li><a href="http://fex.baidu.com/blog/2015/07/we-have-a-problem-with-promises/" target="_blank" rel="noopener">[翻译] We have a problem with promises</a></li>
+<li><a href="http://es6.ruanyifeng.com/#docs/promise" target="_blank" rel="noopener">阮一峰ES6入门指南·Promise对象</a></li>
+</ul>
+<p>补充：看其它的文章，不如看看规范，而且不长，<a href="https://promisesaplus.com/" target="_blank" rel="noopener">https://promisesaplus.com/</a></p>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2019/01/30/nodejs/理解-Promise/ - 理解 Promise @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "理解 Promise",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

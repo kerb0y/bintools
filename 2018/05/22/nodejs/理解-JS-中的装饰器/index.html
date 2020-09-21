@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>理解 JS 中的装饰器 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>理解 JS 中的装饰器</h1>
+        
+        <h2 class="headline">May 22 2018
+        
+            
+            <a href="/blog/categories/Node-js/#Node.js">Node.js</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p><strong>本文为 JS 装饰器旧版，待更新</strong></p>
+<hr>
+<p>什么是装饰器？曾经看过一个说明比较好的比喻，秋天的时候穿秋裤可以保暖，一旦变冷了我们再穿上毛裤，穿毛裤不影响我们穿秋裤，这里的毛裤就是装饰器。</p>
+<p>在JS中，装饰器可以为对象属性添加添加新的配置，而不会影响原有对象的基本功能，这个其实是语法糖。</p>
+<p>举个简单的例子就是</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">readonly</span>(<span class="params">target, key, descriptor</span>) </span>&#123;</span><br><span class="line">  descriptor.writable = <span class="literal">false</span></span><br><span class="line">  <span class="keyword">return</span> descriptor</span><br><span class="line">&#125;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Animal</span> </span>&#123;</span><br><span class="line">  @readonly</span><br><span class="line">  eat (food) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="string">'eating '</span> + food</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里的装饰器函数接受三个参数，分别是目标对象、属性名以及属性描述对象。</p>
+<p>你可能会发现，其实用ES5 的  <code>Object.defineProperty</code> 也可以实现这个功能。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">Object</span>.defineProperty(Animal.prototype, <span class="string">'eat'</span>, &#123;</span><br><span class="line">  value: <span class="function"><span class="keyword">function</span> (<span class="params">food</span>) </span>&#123; <span class="keyword">return</span> <span class="keyword">return</span> <span class="string">'eating '</span> + food &#125;,</span><br><span class="line">  enumerable: <span class="literal">false</span>,</span><br><span class="line">  configurable: <span class="literal">true</span>,</span><br><span class="line">  writable: <span class="literal">true</span></span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<p>就这么简单，就只是语法糖而已。</p>
+<p>当然也可以装饰器也可以作用在类上，简单理解就是为类对象添加静态属性。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">notMan</span>(<span class="params">target</span>) </span>&#123;</span><br><span class="line">  target.isMan = <span class="literal">false</span>;</span><br><span class="line">&#125;</span><br><span class="line">@notMan</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Animal</span> </span>&#123;&#125;</span><br><span class="line"><span class="built_in">console</span>.log(Animal.isMan); <span class="comment">//false</span></span><br></pre></td></tr></table></figure>
+
+<p>就这么简单。更进一步，我们知道在 Angular2+ 中的用到了装饰器，还传递了参数。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">@Component(&#123;</span><br><span class="line">  selector: <span class="string">'app-root'</span>,</span><br><span class="line">  templateUrl: <span class="string">'./app.component.html'</span>,</span><br><span class="line">  styleUrls: [<span class="string">'./app.component.css'</span>]</span><br><span class="line">&#125;)</span><br><span class="line"><span class="keyword">export</span> <span class="class"><span class="keyword">class</span> <span class="title">AppComponent</span> </span>&#123;</span><br><span class="line">  title = <span class="string">'app'</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个其实也简单，就是工厂函数而已，用上面的例子</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">Man</span>(<span class="params">arg</span>) </span>&#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="function"><span class="keyword">function</span>(<span class="params">target</span>) </span>&#123;</span><br><span class="line">    target.isMan = arg;</span><br><span class="line">  &#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">@Man(<span class="literal">false</span>)</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Animal</span> </span>&#123;&#125;</span><br><span class="line"><span class="built_in">console</span>.log(Animal.isMan); <span class="comment">//false</span></span><br></pre></td></tr></table></figure>
+
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2018/05/22/nodejs/理解-JS-中的装饰器/ - 理解 JS 中的装饰器 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "理解 JS 中的装饰器",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

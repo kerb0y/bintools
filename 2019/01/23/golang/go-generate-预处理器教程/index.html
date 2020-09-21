@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>go generate 预处理器教程 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>go generate 预处理器教程</h1>
+        
+        <h2 class="headline">Jan 23 2019
+        
+            
+            <a href="/blog/categories/Golang/#Golang">Golang</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>通常编译 protobuf 会使用 protoc 手动编译，更好一点可以写一个 Makefile 指令来做。</p>
+<p>不过在 Go 中提供一种在源文件定义类似 Makefile 指令 generate。当运行 <a href="https://golang.org/cmd/go/#hdr-Generate_Go_files_by_processing_source" target="_blank" rel="noopener">go generate</a> 后，编译器会找到所有包含 <code>//go:generate command argument...</code> 的注释，然后运行后面的命令。</p>
+<p>那这样的话就不需要再写一个 Makefile 指令了。</p>
+<h3 id="使用-go-generate-工具编译-protobuf"><a href="#使用-go-generate-工具编译-protobuf" class="headerlink" title="使用 go generate 工具编译 protobuf"></a>使用 go generate 工具编译 protobuf</h3><p>新建一个文件目录 test，然后编辑 doc.go 文件。BTW，doc.go 是约定俗成写包文档的文件，通常不会写逻辑代码，所以这里写 generate 指令最好不过了。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//go:generate protoc --go_out=. *.proto</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">package</span> test</span><br></pre></td></tr></table></figure>
+
+<p>generate 指令只能在 go 文件中使用，而且需要注意的是和传统注释不同的是 <code>//</code> 后面不能有空格。</p>
+<p>然后编辑 test.proto 文件</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">syntax=&quot;proto3&quot;;</span><br><span class="line"></span><br><span class="line">message Info &#123;</span><br><span class="line">    uint32 info_id = 1;</span><br><span class="line">    string title = 2;</span><br><span class="line">    string content = 3;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>另外 go build 等其它命令不会调用 <code>go generate</code>，必须手动显式调用 <code>go generate</code> 。不过这报错了，提示找不到文件。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">*.proto: No such file or directory</span><br><span class="line">doc.go:1: running &quot;protoc&quot;: exit status 1</span><br></pre></td></tr></table></figure>
+
+<p>这个问题在文档里有说明，generate 并不处理 glob。那我们这里修改 doc.go 当 sh 直接处理就行了。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//go:generate sh -c "protoc --go_out=. *.proto"</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">package</span> test</span><br></pre></td></tr></table></figure>
+
+<p>另外也要注意，双引号会被 go 进行解析，所以该转义的地方需要注意转义。</p>
+<h3 id="自动生成-Stringer-接口"><a href="#自动生成-Stringer-接口" class="headerlink" title="自动生成 Stringer 接口"></a>自动生成 Stringer 接口</h3><p>在 golang 博客中 <a href="https://blog.golang.org/generate" target="_blank" rel="noopener">generate code</a>介绍了一种类似宏指令的方式。</p>
+<p>假设定义一组不同类型的药物的枚举：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> painkiller</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> Pill <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> (</span><br><span class="line">    Placebo Pill = <span class="literal">iota</span></span><br><span class="line">    Aspirin</span><br><span class="line">    Ibuprofen</span><br><span class="line">    Paracetamol</span><br><span class="line">    Acetaminophen = Paracetamol</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>通常为了能直接 print 其枚举名称，我们会给 <code>Pill</code> 实现 Stringer 接口。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(p Pill)</span> <span class="title">String</span><span class="params">()</span> <span class="title">string</span></span> &#123;</span><br><span class="line">    <span class="keyword">switch</span> p &#123;</span><br><span class="line">    <span class="keyword">case</span> Placebo:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"Placebo"</span></span><br><span class="line">    <span class="keyword">case</span> Aspirin:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"Aspirin"</span></span><br><span class="line">    <span class="keyword">case</span> Ibuprofen:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">"Ibuprofen"</span></span><br><span class="line">    <span class="keyword">case</span> Paracetamol: <span class="comment">// == Acetaminophen</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">"Paracetamol"</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> fmt.Sprintf(<span class="string">"Pill(%d)"</span>, p)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>不过有了 generate 指令我们可以不用手写这些逻辑代码。</p>
+<p>下载并安装 stringer</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">go get golang.org/x/tools/cmd/stringer</span><br></pre></td></tr></table></figure>
+
+<p>在 Pill 包名称上添加一句 <code>//go:generate stringer -type=Pill</code>。通常为了和文档区分开，我们还要加一个空行。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//go:generate stringer -type=Pill</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">package</span> painkiller</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> Pill <span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> (</span><br><span class="line">    Placebo Pill = <span class="literal">iota</span></span><br><span class="line">    Aspirin</span><br><span class="line">    Ibuprofen</span><br><span class="line">    Paracetamol</span><br><span class="line">    Acetaminophen = Paracetamol</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>这时候会自动生成 <code>pill_string.go</code> </p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// generated by stringer -type Pill pill.go; DO NOT EDIT</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">package</span> painkiller</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">"fmt"</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> _Pill_name = <span class="string">"PlaceboAspirinIbuprofenParacetamol"</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> _Pill_index = [...]<span class="keyword">uint8</span>&#123;<span class="number">0</span>, <span class="number">7</span>, <span class="number">14</span>, <span class="number">23</span>, <span class="number">34</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(i Pill)</span> <span class="title">String</span><span class="params">()</span> <span class="title">string</span></span> &#123;</span><br><span class="line">    <span class="keyword">if</span> i &lt; <span class="number">0</span> || i+<span class="number">1</span> &gt;= Pill(<span class="built_in">len</span>(_Pill_index)) &#123;</span><br><span class="line">        <span class="keyword">return</span> fmt.Sprintf(<span class="string">"Pill(%d)"</span>, i)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> _Pill_name[_Pill_index[i]:_Pill_index[i+<span class="number">1</span>]]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="命令格式"><a href="#命令格式" class="headerlink" title="命令格式"></a>命令格式</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">go generate [-run regexp] [-n] [-v] [-x] [build flags] [file.go... | packages]</span><br><span class="line"></span><br><span class="line">-v 输出被处理的包名和源文件名</span><br><span class="line">-n 显示不执行命令</span><br><span class="line">-x 显示并执行命令</span><br><span class="line"></span><br><span class="line">-run 正则匹配要运行的指令</span><br></pre></td></tr></table></figure>
+
+<p>还可以在命令中定义别名，不过只有当前文件内有效。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">//go:generate -command YACC go tool yacc</span><br><span class="line">//go:generate YACC -o test.go -p parse test.y</span><br></pre></td></tr></table></figure>
+
+<p>另外还支持下面这些变量：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">$GOARCH</span><br><span class="line">    CPU架构 (arm、amd64等）</span><br><span class="line">$GOOS</span><br><span class="line">    操作系统类型(linux、windows等)</span><br><span class="line">$GOFILE</span><br><span class="line">    当前处理中的文件名（就是文件名，不包含路径）</span><br><span class="line">$GOLINE</span><br><span class="line">    当前命令在文件中的行号</span><br><span class="line">$GOPACKAGE</span><br><span class="line">    当前处理文件的包名（只是当前包名，不包含路径）</span><br><span class="line">$DOLLAR</span><br><span class="line">    美元符号</span><br></pre></td></tr></table></figure>
+
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2019/01/23/golang/go-generate-预处理器教程/ - go generate 预处理器教程 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "go generate 预处理器教程",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

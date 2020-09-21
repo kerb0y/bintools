@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>比特币中交易延展性问题 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>比特币中交易延展性问题</h1>
+        
+        <h2 class="headline">Aug 01 2018
+        
+            
+            <a href="/blog/categories/blockchain/#blockchain">blockchain</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h2 id="交易延展性-Transaction-Malleability"><a href="#交易延展性-Transaction-Malleability" class="headerlink" title="交易延展性 (Transaction Malleability)"></a>交易延展性 (Transaction Malleability)</h2><p>当交易被签名时，签名并没有覆盖交易中所有的数据 (比如位于 txin 中的 scriptSig，由于 scriptSig 中包含公钥和签名数据，不可能对自身自签名)，而交易中所有的数据又会被用来生成交易的哈希值来作为该交易的唯一标示。如此，尽管不常见的，比特币网络中的一个节点能够改变你发送的交易 (通过改变 txin 中的签名)，导致该交易的哈希值发生变化。注意，攻击者仅仅能够改变该哈希值，交易中的 txout 是无法进行改变的，因此比特币最终也许会转入你原本打算的地址中。然而，这确实意味着，例如，在任何情况下，接收一系列未确认交易的链是不安全的，因为未确认交易的哈希值可能会发生变化，而随后的交易中的 txin 会依赖于先前交易的哈希值。即使交易得到了一个确认，也是不安全的，因为区块链可能会被重新调整。此外，客户端必须一直扫描收到的交易，假定一个 txout 是存在的，因为先前创建该笔交易的客户端可能是不安全的 (可能会发两笔同样 txout 的交易)。</p>
+<h2 id="签名延展性-Signature-Malleability"><a href="#签名延展性-Signature-Malleability" class="headerlink" title="签名延展性 (Signature Malleability)"></a>签名延展性 (Signature Malleability)</h2><p>延展性的第一种形式就是签名本身。每一个签名恰好有一个 DER-encoded ASN.1 octet representation，但是 OpenSSL 并没有强制，只要一笔签名没有极度的改变，它就是可接受的。此外，对于每一个 ECDSA signature(r,s)，这个 signature(r,-s(mod N)) 是相同消息的一个有效签名。<br>在 363742 区块高度处，BIP66 软分叉强制区块链中所有新交易遵循 DER-encoded ASN.1 标准。仍然需要进一步的努力来关闭 DER 签名其它可能的延展性问题。<br>签名仍然是可以被拥有相应私钥的人改变的。</p>
+<h2 id="解锁脚本延展性-scriptSig-Malleability"><a href="#解锁脚本延展性-scriptSig-Malleability" class="headerlink" title="解锁脚本延展性 (scriptSig Malleability)"></a>解锁脚本延展性 (scriptSig Malleability)</h2><p>比特币中使用的签名算法没有签署 scriptSig 中的任何数据。因为对整个 scriptSig 签名是不可能的，scriptSig 包含签名本身。这意味着，附件的数据能被添加到 scriptSig 中，额外的数据会先于所需的签名和公钥压入栈中。类似的 OP_DROP 能被添加，使得最终栈的状态与 scriptPubKey 执行之前的状态相同。<br>阻止 scriptSig 延展性正在被考虑当中。目前，如果交易 txin 的 scriptSig 中若包含除了签名与公钥之外其它数据，则该交易被认为是不标准的，不会被节点转发。最终，这个规则会强制在 scriptPubKey 执行完之后，栈中只剩下一个元素。然而，要做到这样，需要比特币随后的扩展。</p>
+<p>隔离验证 (segregated witness) 通过将 scriptSig 从交易的 txin 中分离出来，放入到一个新添加的 witness 字段中，来解决相关延展性问题，由于签名数据从交易中分离出来，使得交易结构尺寸变小，可以使得区块能容纳更多的交易，侧面达到了轻微扩容的目的，有关隔离验证的知识，可查看 BIP 141-145。</p>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2018/08/01/blockchain/比特币中交易延展性问题/ - 比特币中交易延展性问题 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "比特币中交易延展性问题",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

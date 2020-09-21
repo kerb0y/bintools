@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>Ubuntu新建用户并赋予权限清单 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>Ubuntu新建用户并赋予权限清单</h1>
+        
+        <h2 class="headline">May 20 2018
+        
+            
+            <a href="/blog/categories/Linux/#Linux">Linux</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>通常新建用户会遇到很多问题，比如 shell 不支持 tab 提示，下述流程解决了常见新建用户出现的问题。</p>
+<h2 id="新建用户"><a href="#新建用户" class="headerlink" title="新建用户"></a>新建用户</h2><p>首先在建立一个用户家目录，一般建立在 <code>/home</code> 下，目录名一般直接使用用户名。接着使用 <code>useradd</code> 命令继续，命令结构如下。</p>
+<p><code>useradd -d HOME-DIR -s /bin/bash -c COMMET -G GOURP-NAME USER-NAME</code></p>
+<p><code>-d</code> 指示用户家目录，使用刚才新建的目录即可。<code>-c</code> 指定注释。</p>
+<p><code>-s</code> 指定 shell，默认是不指定的，一定要加上，要不然就会出现上述说的问题。</p>
+<p> <code>-G</code> 指定用户组，之后也可以使用 <code>usermod -aG GROUP-NAME USER-NAME</code> 进行添加。</p>
+<p>最后再加上用户名称即可。</p>
+<p>值得注意的是 <code>-p</code> 可以指定登录密码，但是我尝试过没有成功。还有一个方式指定密码，使用 <code>passwd USER-NAME</code> 即可。</p>
+<p>详细的参数在文后有说明。然后给用户家目录赋权</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo chown -R user:group /home/user</span><br><span class="line">sudo chmod -R 770 /home/user</span><br></pre></td></tr></table></figure>
+
+<p>最后复制shell模板到家目录</p>
+<p><code>sudo /etc/skel/.bashrc /home/user</code></p>
+<h2 id="root-权限"><a href="#root-权限" class="headerlink" title="root 权限"></a>root 权限</h2><p>编辑 <code>/etc/sudoers</code> </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># User privilege specification</span><br><span class="line">root	ALL=(ALL:ALL) ALL</span><br><span class="line">user  ALL=(ALL:ALL) ALL</span><br></pre></td></tr></table></figure>
+
+<p>之前提及过 usermod 可以把用户添加到用户组，在 <code>/etc/sudoers</code> 后有说明将用户添加 <code>sudo</code> 组就可以使用 <code>sudo</code> 命令获取管理权限，在 CentOS上通常是 wheel 组而不是 sudo 组。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"># Allow members of group sudo to execute any command</span><br><span class="line">%sudo	ALL=(ALL:ALL) ALL</span><br></pre></td></tr></table></figure>
+
+<p>第一个“ALL”表示该规则适用于所有主机，第二个表示root用户可以像所有用户一样运行命令，第三个表示root用户可以像所有组一样运行命令，最后一个“ALL”表示这些规则适用于所有命令。详情可参考<a href="https://www.digitalocean.com/community/tutorials/how-to-edit-the-sudoers-file-on-ubuntu-and-centos" target="_blank" rel="noopener">这里</a>。</p>
+<p>如果已经在命令中设置将新用户加入 root sudo 用户组的，以上的规则设定也可以不用。</p>
+<p>最后退出当前用户，重新使用新用户登录试一试吧！</p>
+<h2 id="更新"><a href="#更新" class="headerlink" title="更新"></a>更新</h2><p>更简单的命令，直接会创建用户家目录以及将 .bashrc 等文件移动到用户家目录。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">useradd --create-home username</span><br></pre></td></tr></table></figure>
+
+<h2 id="useradd-命令清单"><a href="#useradd-命令清单" class="headerlink" title="useradd 命令清单"></a>useradd 命令清单</h2><img width="649" alt="2018-03-17 5 10 34" src="https://user-images.githubusercontent.com/24730006/37553587-2ea56f52-2a06-11e8-82d7-d638abbfe5c9.png">
+</section>
+    
+        
+        <h2 class="footline">
+            <a href="/blog/tags/ubuntu/#ubuntu">ubuntu</a>
+        </h2>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2018/05/20/linux/Ubuntu新建用户并赋予权限清单/ - Ubuntu新建用户并赋予权限清单 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "Ubuntu新建用户并赋予权限清单",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

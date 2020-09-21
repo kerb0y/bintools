@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>在 Ubuntu 上安装 Docker - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>在 Ubuntu 上安装 Docker</h1>
+        
+        <h2 class="headline">May 20 2018
+        
+            
+            <a href="/blog/categories/Linux/#Linux">Linux</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>建议把Docker安装在linux系统上学习使用，如果使用 Windows 可以使用虚拟机安装 Ubuntu 进行学习。</p>
+<p>补充一点，如果在windows上安装，官方推荐使用 windows 10 专业版，因为这个版本才包含Hyper-V的虚拟化服务，能让docker具有像linux一样的底层兼容性，如果没有使用这个版本，官方建议下载docker tool进行安装。当然还是建议Windows用户装linux虚拟机进行学习。</p>
+<h1 id="Docker-版本说明"><a href="#Docker-版本说明" class="headerlink" title="Docker 版本说明"></a>Docker 版本说明</h1><p>Docker在apt源仓库里面注册了很多名称，比如docker.io，比如docker-engine，这些都不是我们需要的旧版本，新版的Docker就只有两个，一个是社区版本的docker-ce，一个是收费的企业版docker-ee。  </p>
+<p>不过，目前（2017年4月7日 17:01:37），ubuntu官方源还没有新版的docker，所以我们可以按照<a href="https://store.docker.com/editions/community/docker-ce-server-ubuntu" target="_blank" rel="noopener">官方的说明</a>，一步一步来安装docker。</p>
+<h1 id="使用官方脚本-中国镜像安装"><a href="#使用官方脚本-中国镜像安装" class="headerlink" title="使用官方脚本+中国镜像安装"></a>使用官方脚本+中国镜像安装</h1><p>下方命令适用于 Ubuntu 并且软件包源是阿里云的。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -fsSL https://get.docker.com | sudo sh -s -- --mirror Aliyun</span><br></pre></td></tr></table></figure>
+
+<h1 id="设置当前用户到docker组"><a href="#设置当前用户到docker组" class="headerlink" title="设置当前用户到docker组"></a>设置当前用户到docker组</h1><p>如果当前用户不是 docker 组，那么是无法直接运行docker命令的，所以在安装完成之后，建议设置当前用户到docker组中。</p>
+<p><code>sudo usermod -aG docker $USER</code></p>
+<p>这样做之后，直接可以运行<code>docker images</code>等命令再也不需要root权限了。</p>
+<h1 id="配置国内镜像加速"><a href="#配置国内镜像加速" class="headerlink" title="配置国内镜像加速"></a>配置国内镜像加速</h1><p>使用阿里云 Docker 镜像源</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">sudo mkdir -p /etc/docker</span><br><span class="line">sudo tee /etc/docker/daemon.json &lt;&lt;-&apos;EOF&apos;</span><br><span class="line">&#123;</span><br><span class="line">  &quot;registry-mirrors&quot;: [&quot;https://t9ab0rkd.mirror.aliyuncs.com&quot;]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line">sudo systemctl daemon-reload</span><br><span class="line">sudo systemctl restart docker</span><br></pre></td></tr></table></figure>
+
+<p>成功之后，运行<code>docker pull ubuntu</code>可以试一试速度。</p>
+<h1 id="docker-compose"><a href="#docker-compose" class="headerlink" title="docker-compose"></a>docker-compose</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">## install</span><br><span class="line">sudo curl -L https://github.com/docker/compose/releases/download/1.23.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose</span><br><span class="line">sudo chmod +x /usr/local/bin/docker-compose</span><br><span class="line"></span><br><span class="line">## update</span><br><span class="line">docker-compose migrate-to-labels</span><br><span class="line">## uninstall</span><br><span class="line">sudo rm /usr/local/bin/docker-compose</span><br></pre></td></tr></table></figure>
+
+<p>注意：上述命令行安装 1.23.2 版本的，最新版本需要查看 </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -H &apos;Accept: application/json&apos; -L https://github.com/docker/compose/releases/latest | jq .</span><br></pre></td></tr></table></figure>
+
+<p>找到 tag_name 字段</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"id"</span>: <span class="number">14244264</span>,</span><br><span class="line">  <span class="attr">"tag_name"</span>: <span class="string">"1.23.2"</span>,</span><br><span class="line">  <span class="attr">"update_url"</span>: <span class="string">"/docker/compose/releases/tag/1.23.2"</span>,</span><br><span class="line">  <span class="attr">"update_authenticity_token"</span>: <span class="string">"ruuFEJbQZIdnDBjFGghteL2H6UG6BmliYI18SDLOgnO5hlJlRZB2dDs+qOjkHMamP9bp2ymKrr9Ytao0DtEEiQ=="</span>,</span><br><span class="line">  <span class="attr">"delete_url"</span>: <span class="string">"/docker/compose/releases/tag/1.23.2"</span>,</span><br><span class="line">  <span class="attr">"delete_authenticity_token"</span>: <span class="string">"C3JVkok9yjBOrFiNId+amBceStAPLfxm0P1IlXvNLOsdE2gxaZLhR12WsZYYpfMNiZsmHrNmVpf/Z0B2ddUKVw=="</span>,</span><br><span class="line">  <span class="attr">"edit_url"</span>: <span class="string">"/docker/compose/releases/edit/1.23.2"</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="Docker-tips"><a href="#Docker-tips" class="headerlink" title="Docker tips"></a>Docker tips</h1><h2 id="权限不足错误"><a href="#权限不足错误" class="headerlink" title="权限不足错误"></a>权限不足错误</h2><h3 id="zsh-错误"><a href="#zsh-错误" class="headerlink" title="zsh 错误"></a>zsh 错误</h3><p>修复方式： </p>
+<p><code>sudo chown -R [username]:staff &quot;$ZSH_CACHE_DIR&quot;</code></p>
+<p>详细：<a href="https://github.com/robbyrussell/oh-my-zsh/issues/3700" target="_blank" rel="noopener">https://github.com/robbyrussell/oh-my-zsh/issues/3700</a></p>
+<h2 id="unix-socket-错误"><a href="#unix-socket-错误" class="headerlink" title="unix socket 错误"></a>unix socket 错误</h2><p>默认情况下，docker 命令会使用 Unix socket 与 Docker 引擎通讯。而只有 root 用户和 docker 组的用户才可以访问 Docker 引擎的 Unix socket。出于安全考虑，一般 Linux 系统上不会直接使用 root 用户。因此，更好地做法是将需要使用 docker 的用户加入 docker 用户组。</p>
+<p>建立 docker 组：</p>
+<p><code>$ sudo groupadd docker</code></p>
+<p>将当前用户加入 docker 组：</p>
+<p><code>$ sudo usermod -aG docker $USER</code></p>
+<p>退出当前终端并重新登录，进行如下测试。</p>
+<h2 id="国内使用-apt-速度很慢"><a href="#国内使用-apt-速度很慢" class="headerlink" title="国内使用 apt 速度很慢"></a>国内使用 apt 速度很慢</h2><p>通常在 Dockerfile 内会使用 apt 进行安装软件，但是 <code>apt update</code> 会因为网络原因很慢很慢，这个时候可以加上镜像源。 </p>
+<p>解决方式：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">RUN sed -i &apos;s/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.163\.com\/ubuntu\//g&apos; /etc/apt/sources.list</span><br></pre></td></tr></table></figure>
+
+<h2 id="使用前台命令运行容器"><a href="#使用前台命令运行容器" class="headerlink" title="使用前台命令运行容器"></a>使用前台命令运行容器</h2><p>例如在 nginx 的官方版本中有设置 </p>
+<figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CMD</span><span class="bash"> [<span class="string">"nginx"</span>, <span class="string">"-g"</span>, <span class="string">"daemon off;"</span>, ]</span></span><br></pre></td></tr></table></figure>
+
+<p>所以不要在 Dockerfile 中使用 <code>service xx start</code> 或者 <code>systemctl start xx.service</code>.</p>
+<p>对于JS而言，npm run 就是使用的后台命令。比如说在 <code>npm start</code> 的命令是 <code>node index.js</code> 的话，而 <code>index.js</code> 是一个服务器应用，那么在 Docker 中不会成功运行，而且运行之后会自动退出容器。</p>
+</section>
+    
+        
+        <h2 class="footline">
+            <a href="/blog/tags/Docker/#Docker">Docker</a>
+        </h2>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2018/05/20/linux/在-Ubuntu-上安装-Docker/ - 在 Ubuntu 上安装 Docker @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "在 Ubuntu 上安装 Docker",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

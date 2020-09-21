@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>从随机数到比特币地址 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>从随机数到比特币地址</h1>
+        
+        <h2 class="headline">Feb 13 2019
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h2 id="从随机数到私钥"><a href="#从随机数到私钥" class="headerlink" title="从随机数到私钥"></a>从随机数到私钥</h2><p>比特币是去中心化的，生成地址更是和传统银行中心化方式不同。</p>
+<p>地址不需要中心化组织确认是否有重复，使用者也不需要担心会与别人地址重复，因为地址空间的数量达到 2<sup>256</sup> 个，用十进制表示的话，大约是 10<sup>77</sup> ，而可见宇宙被估计只含有 10<sup>80</sup> 个原子。更通俗话的讲地址重复的可能性比被陨石砸到的的几率还要低。</p>
+<p>上述我提到 256 这个数字就是比特币的使用随机熵的比特位数，简单说就是一个 256 bits 的随机数，有时候还会被称作为种子。</p>
+<p>一个种子可以直接作为比特币的私钥，<strong>不过为了更加安全</strong>，通常会再使用 sha256 进行哈希一次后作为私钥。</p>
+<p>读到这里，你已经看到一些一些名词，如果你了解非对称加密以及哈希算法的话，接下来就不会太难理解。</p>
+<p>如果使用 Node.js 进行生成密钥的话，就像是如下代码：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> crypto = <span class="built_in">require</span>(<span class="string">"crypto"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 32字节即256位的种子</span></span><br><span class="line"><span class="keyword">const</span> seed = crypto.randomBytes(<span class="number">32</span>);</span><br><span class="line"><span class="comment">// 生成私钥</span></span><br><span class="line"><span class="keyword">const</span> priKey = crypto</span><br><span class="line">  .createHash(<span class="string">"sha256"</span>)</span><br><span class="line">  .update(seed)</span><br><span class="line">  .digest();</span><br><span class="line"></span><br><span class="line"><span class="comment">// 打印可读的16 进制字符串</span></span><br><span class="line"><span class="built_in">console</span>.log(priKey.toString(<span class="string">"hex"</span>));</span><br></pre></td></tr></table></figure>
+
+<p>到了这里还很简单，就只遇到一个安全的随机数生成器，还有一个 sha256 的哈希函数。其中随机数生成器都是使用密码学安全的算法或者从随机源中获取，一些自己实现的很少，这里的 crypto.randomBytes 就是从计算机内部各种事件生成的。</p>
+<p>当然为了随机，你还可以投硬币，只要 256 次即可。还有一些<a href="https://github.com/pointbiz/bitaddress.org" target="_blank" rel="noopener">网页的场景</a>，通过随机滑动鼠标进行生成随机种子。</p>
+<p>如果使用 <a href="https://bitcoin.org/en/download" target="_blank" rel="noopener">Bitcoin core</a> 的钱包的话，可使用下面 RPC 命令进行。</p>
+<p>以下为具体命令和步骤。</p>
+<p><code>bitcoind getnewaddress</code></p>
+<p>这个命令会返回地址，因为私钥不能默认返回，地址为 <code>13smYdDuR5S1zy1Ypu8C65bJmZENooC5hm</code>，我们还需要进行一步。</p>
+<p><code>dumpprivkey 13smYdDuR5S1zy1Ypu8C65bJmZENooC5hm</code></p>
+<p>这样就返回了我们需要的私钥，<code>KxmRvNP7j7ZXGsspiWJi4prmaYYCuNUEh1NCPQTSht3uSHwxyfrc</code>。</p>
+<h2 id="从私钥到公钥"><a href="#从私钥到公钥" class="headerlink" title="从私钥到公钥"></a>从私钥到公钥</h2><p>假设上一节中我们生成了一个私钥：</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1E99423A4ED27608A15A2616A2B0E9E52CED330AC530EDCC32C8FFC6A526AEDD</span><br></pre></td></tr></table></figure>
+
+<p>比特币使用 secp256k1 椭圆曲线加密算法（ECC）来生成公钥。椭圆曲线加密算法比较难理解，这里就不详述，比较简单的理解是可以私钥可以看做曲线上的一个点，私钥可以根据某个特定点进行计算来获取公钥，而这个过程基本是不可逆的。</p>
+<p><img src="https://user-images.githubusercontent.com/24730006/52675116-b6b21200-2f60-11e9-8840-a4b84efc43f2.png" alt="image"></p>
+<p>node.js crypto 模块已经封装了接下来需要的功能：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> priKey = Buffer.from(</span><br><span class="line">  <span class="string">"1E99423A4ED27608A15A2616A2B0E9E52CED330AC530EDCC32C8FFC6A526AEDD"</span>,</span><br><span class="line">  <span class="string">"hex"</span></span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 获取曲线</span></span><br><span class="line"><span class="keyword">const</span> secp256k1 = crypto.createECDH(<span class="string">"secp256k1"</span>);</span><br><span class="line"><span class="comment">// 设置私钥</span></span><br><span class="line">secp256k1.setPrivateKey(priKey);</span><br><span class="line"><span class="comment">// 获取非压缩公钥</span></span><br><span class="line"><span class="keyword">const</span> pubKey = secp256k1.getPublicKey(<span class="literal">undefined</span>, <span class="string">"uncompressed"</span>);</span><br><span class="line"><span class="built_in">console</span>.log(pubKey.toString(<span class="string">"hex"</span>));</span><br><span class="line"></span><br><span class="line"><span class="comment">// 输出结果</span></span><br><span class="line"><span class="comment">// 04 +</span></span><br><span class="line"><span class="comment">// f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a +</span></span><br><span class="line"><span class="comment">// 07cf33da18bd734c600b96a72bbc4749d5141c90ec8ac328ae52ddfe2e505bdb +</span></span><br></pre></td></tr></table></figure>
+
+<p>对于输出结果对应椭圆曲线上的坐标点，先忽略 <code>04</code> 那么首先是 x 轴坐标，接着就是 y 轴坐标。</p>
+<p>在获取公钥的时候，第二个参数传递 <code>uncompressed</code> 表明公钥取非压缩版本，那么 <code>04</code> 就代表非压缩标识符。</p>
+<p>那么相应的还有压缩版本，把获取公钥步骤时第二个参数换成 <code>compressed</code>，那么输出结果就成了： <code>03 + f028892bad7ed57d2fb57bf33081d5cfcf6f9ed3d3d7f159c2e2fff579dc341a</code>。</p>
+<p>数据量上少了一半。<code>03</code> 不是代表压缩版本的意思，而是代表非压缩压缩版本的对应数值是奇数，也就是上面非压缩公钥的最后一个字母 <code>b</code> 也就是 11，那么肯定是奇数，所以是 <code>03</code>。那如果是偶数呢？就换成 <code>02</code>。</p>
+<h2 id="从公钥到地址"><a href="#从公钥到地址" class="headerlink" title="从公钥到地址"></a>从公钥到地址</h2><p>之后我们需要计算 <code>hash160(pubkey)</code>，也就是 <code>RIPEMD160(SHA256(K))</code></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> sha256_result = crypto</span><br><span class="line">  .createHash(<span class="string">"sha256"</span>)</span><br><span class="line">  .update(pubKey)</span><br><span class="line">  .digest();</span><br><span class="line"><span class="keyword">const</span> ripemed160_result = crypto</span><br><span class="line">  .createHash(<span class="string">"ripemd160"</span>)</span><br><span class="line">  .update(sha256_result)</span><br><span class="line">  .digest();</span><br></pre></td></tr></table></figure>
+
+<p>到了这一步的结果 ripemed160_result 基本就代表了比特币地址了，但是并不是日常见到的地址，可以称之为地址公钥。</p>
+<p>为了把地址公钥转换成可打印形式，我们需要对它进行 base58check 操作。</p>
+<p>Base58 不含 Base64 中的 0（数字 0）、O（大写字母 o）、l（小写字母 L）、I（大写字母 i），以及“+”和“/”两个字符。简而言之，Base58 就是由不包括（0，O，l，I）的大小写字母和数字组成，这样使得地址长度变小而且更容易辨认手写体。</p>
+<p>base58 其实和 base64 之类的操作相似。举个都知道的例子，十进制转换成二进制的时候是<code>除 2 取余，逆序排列</code> 的方式，那么 base58 也差不多，不过换成了 <code>除 58 取余，逆序排列</code>。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> table = <span class="string">"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"</span>;</span><br><span class="line"><span class="keyword">const</span> zero = <span class="number">0</span>n;</span><br><span class="line"><span class="keyword">const</span> base = <span class="number">58</span>n;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> bs58 = <span class="function">(<span class="params">buf: Buffer</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> hex = buf.toString(<span class="string">"hex"</span>);</span><br><span class="line">  <span class="keyword">let</span> x = hex.length === <span class="number">0</span> ? zero : BigInt(<span class="string">"0x"</span> + hex);</span><br><span class="line">  <span class="keyword">let</span> res = <span class="string">""</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span> (x &gt; zero) &#123;</span><br><span class="line">    res = table[<span class="built_in">Number</span>(x % base)] + res;</span><br><span class="line">    x = x / base;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (<span class="keyword">let</span> i = <span class="number">0</span>; i &lt; hex.length; i += <span class="number">2</span>) &#123;</span><br><span class="line">    <span class="keyword">if</span> (hex[i] === <span class="string">"0"</span> &amp;&amp; hex[i + <span class="number">1</span>] === <span class="string">"0"</span>) &#123;</span><br><span class="line">      res = <span class="string">"1"</span> + res;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> res;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这一步得到就是 base58 之后的结果。不过我们需要 base58check。而 base58check 就是在 base58 之前对数据加上校验和，防止数据出错。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 原始数据加上 version prefix 进行两次 sha256 运算</span></span><br><span class="line"><span class="comment">// 取前 4 字节作为校验和</span></span><br><span class="line">checksum := SHA256x2(version + pubKeyHash)[:<span class="number">4</span>]</span><br><span class="line"><span class="comment">// 然后进行拼接数据后再进行 base58 就是比特币地址了</span></span><br><span class="line">payload := version + pubKeyHash + checksum</span><br><span class="line">address := bs58(payload)</span><br></pre></td></tr></table></figure>
+
+<p>就此比特币地址生成完毕，更具体的流程可参见《精通比特币》第四章《密钥和地址》。</p>
+</section>
+    
+        
+        <h2 class="footline">
+            <a href="/blog/tags/nodejs/#nodejs">nodejs</a>, <a href="/blog/tags/bitcoin/#bitcoin">bitcoin</a>
+        </h2>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2019/02/13/blockchain/从随机数到比特币地址/ - 从随机数到比特币地址 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "从随机数到比特币地址",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

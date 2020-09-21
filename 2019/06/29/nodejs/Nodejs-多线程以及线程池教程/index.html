@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>Nodejs 多线程以及线程池教程 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>Nodejs 多线程以及线程池教程</h1>
+        
+        <h2 class="headline">Jun 29 2019
+        
+            
+            <a href="/blog/categories/Node-js/#Node.js">Node.js</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>Nodejs v11.7.0 发布后，woker_threads API 就进入基本稳定状态，不需要在运行时候加上 <code>--experimental-worker</code> 标识了。</p>
+<p>worker 对于执行 CPU 密集型操作非常有用，但对 I/O 密集型操作没有多大帮助，使用内置异步 I/O 操作效率更高。</p>
+<h2 id="API-简介"><a href="#API-简介" class="headerlink" title="API 简介"></a>API 简介</h2><p>创建一个 worker 线程很简单：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// index.js</span></span><br><span class="line"><span class="keyword">const</span> &#123; Worker &#125; = <span class="built_in">require</span>(<span class="string">"worker_threads"</span>);</span><br><span class="line"><span class="keyword">const</span> worker = <span class="keyword">new</span> Worker(<span class="string">`<span class="subst">$&#123;__dirname&#125;</span>/worker.js`</span>);</span><br></pre></td></tr></table></figure>
+
+<p>这里是在相同的目录创建一个文件 worker.js，通过加载这个文件来创建线程，这个和前端 worker 基本一致，不过 node.js 也提供了一个同文件创建线程的方式：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; Worker, isMainThread &#125; = <span class="built_in">require</span>(<span class="string">"worker_threads"</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (isMainThread) &#123;</span><br><span class="line">  <span class="comment">// 主线程处理逻辑</span></span><br><span class="line">  <span class="keyword">const</span> worker = <span class="keyword">new</span> Worker(__filename);</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">  <span class="comment">// worker 线程处理逻辑</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果要向 worker 线程传递数据的话，可以通过事件通知的方式来传递数据：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">worker.postMessage(value);</span><br></pre></td></tr></table></figure>
+
+<p>value 可以是合法地 JS 数据，不过这里会拷贝数据，并且拷贝数据的逻辑要遵循 HTML 结构化克隆算法。</p>
+<blockquote>
+<p>结构化克隆算法是由 HTML5 规范定义的用于复制复杂 JavaScript 对象的算法。通过来自 Workers 的 postMessage() 或使用 IndexedDB 存储对象时在内部使用。它通过递归输入对象来构建克隆，同时保持先前访问过的引用的映射，以避免无限遍历循环。结构化克隆所不能做到的: Error 以及 Function 对象是不能被结构化克隆算法复制的；如果你尝试这样子去做，这会导致抛出 DATA_CLONE_ERR 的异常。2、企图去克隆 DOM 节点同样会抛出 DATA_CLONE_ERROR 异常。3、对象的某些特定参数也不会被保留，RegExp 对象的 lastIndex 字段不会被保留；属性描述符，setters 以及 getters（以及其他类似元数据的功能）同样不会被复制。例如，如果一个对象用属性描述符标记为 read-only，它将会被复制为 read-write，因为这是默认的情况下；原形链上的属性也不会被追踪以及复制。<a href="https://developer.mozilla.org/zh-CN/docs/Web/Guide/API/DOM/The_structured_clone_algorithm" target="_blank" rel="noopener">https://developer.mozilla.org/zh-CN/docs/Web/Guide/API/DOM/The_structured_clone_algorithm</a></p>
+</blockquote>
+<p>相应的主线程接收数据则可以通过 <code>worker.on(&quot;message&quot;, ...)</code> 接收数据：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">worker.on(<span class="string">"message"</span>, resp =&gt; &#123;</span><br><span class="line">  <span class="comment">// ...</span></span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>相应的 Worker 线程收发数据和主线程基本一致，不过这里的事件对象换成了 parentPort，而这个对象可以直接从 worker 包获取</p>
+<p>那么 worker 线程可以使用 <code>parentPort.on(&quot;message&quot;, ...)</code> 接收数据：</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; parentPort &#125; = <span class="built_in">require</span>(<span class="string">"worker_threads"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// receive from main thread</span></span><br><span class="line">parentPort.on(<span class="string">"message"</span>, buf =&gt; &#123;</span><br><span class="line">    <span class="comment">// post to main thread</span></span><br><span class="line">    parentPort.postMessage(buf);</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>主线程除了可以直接 postMessage 传递数据，另外也可以创建 worker 的时候传递。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> worker = <span class="keyword">new</span> Worker(__filename, &#123;</span><br><span class="line">  workerData: <span class="string">"data"</span></span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>相应的 worker 线程接受则换成了 <code>workerData</code></p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; workerData &#125; = <span class="built_in">require</span>(<span class="string">"worker_threads"</span>);</span><br></pre></td></tr></table></figure>
+
+<p>最基本的 API 介绍完毕后就可以写一个简单的 demo ，从 worker 线程中获取随机数据。</p>
+<p>index.js 暴露随机数据接口</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; Worker &#125; = <span class="built_in">require</span>(<span class="string">"worker_threads"</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> random = <span class="function">(<span class="params">size <span class="regexp">/** number */</span></span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve, reject</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">const</span> worker = <span class="keyword">new</span> Worker(<span class="string">`<span class="subst">$&#123;__dirname&#125;</span>/worker.js`</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// copy</span></span><br><span class="line">    worker.postMessage(size);</span><br><span class="line"></span><br><span class="line">    worker.on(<span class="string">"message"</span>, (resp <span class="comment">/** &#123; error: Error; data: Buffer &#125; */</span>) =&gt; &#123;</span><br><span class="line">      <span class="keyword">const</span> &#123; data, error &#125; = resp;</span><br><span class="line">      <span class="keyword">if</span> (error) &#123;</span><br><span class="line">        reject(err);</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        resolve(data);</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="comment">// exit thread</span></span><br><span class="line">      worker.terminate();</span><br><span class="line">    &#125;);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// The 'error' event is emitted if the worker thread throws an uncaught exception.</span></span><br><span class="line">    <span class="comment">// In that case, the worker will be terminated.</span></span><br><span class="line">    worker.on(<span class="string">"error"</span>, (err <span class="comment">/* Error*/</span>) =&gt; &#123;</span><br><span class="line">      reject(err);</span><br><span class="line">      <span class="comment">// exit thread</span></span><br><span class="line">      worker.terminate();</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="built_in">module</span>.exports = random;</span><br></pre></td></tr></table></figure>
+
+<p>worker.js worker 线程逻辑</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; parentPort &#125; = <span class="built_in">require</span>(<span class="string">"worker_threads"</span>);</span><br><span class="line"><span class="keyword">const</span> &#123; randomBytes &#125; = <span class="built_in">require</span>(<span class="string">"crypto"</span>);</span><br><span class="line">parentPort.on(<span class="string">"message"</span>, size =&gt; &#123;</span><br><span class="line">  <span class="keyword">const</span> response = &#123;</span><br><span class="line">    error: <span class="literal">null</span>,</span><br><span class="line">    data: <span class="literal">null</span></span><br><span class="line">  &#125;;</span><br><span class="line"></span><br><span class="line">  randomBytes(size, (err, buf) =&gt; &#123;</span><br><span class="line">    <span class="keyword">if</span> (err) &#123;</span><br><span class="line">      response.err = err;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      response.data = buf;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    parentPort.postMessage(response);</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>test.js 测试调用</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> random = <span class="built_in">require</span>(<span class="string">"./thread"</span>);</span><br><span class="line">(<span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">  <span class="built_in">console</span>.time(<span class="string">"Worker mode"</span>);</span><br><span class="line">  <span class="keyword">const</span> result = <span class="keyword">await</span> random(<span class="number">32</span>);</span><br><span class="line">  result.toString(<span class="string">"hex"</span>);</span><br><span class="line">  <span class="built_in">console</span>.timeEnd(<span class="string">"Worker mode"</span>);</span><br><span class="line">&#125;)().catch(<span class="built_in">console</span>.error);</span><br></pre></td></tr></table></figure>
+
+<p>结果数据：<code>Worker mode: 63.023ms</code></p>
+<p>使用正常的模式看看耗时</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; randomBytes &#125; = <span class="built_in">require</span>(<span class="string">"crypto"</span>);</span><br><span class="line"><span class="built_in">console</span>.time(<span class="string">"Normal mode"</span>);</span><br><span class="line">randomBytes(<span class="number">32</span>, (err, buf) =&gt; &#123;</span><br><span class="line">  <span class="keyword">if</span> (err) &#123;</span><br><span class="line">    <span class="built_in">console</span>.error(err);</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    buf.toString(<span class="string">"hex"</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">console</span>.timeEnd(<span class="string">"Normal mode"</span>);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>结果数据：<code>Normal mode: 0.383ms</code></p>
+<p>耗时挺严重的，这是上面我们的例子中每次调用都会创建销毁一个线程，这个耗时最大了，而且线程间拷贝传递数据也会耗时。</p>
+<p>所以官方推荐使用线程池模式以及使用 <code>SharedArrayBuffer</code> 传递数据避免拷贝。</p>
+<h2 id="线程池-Demo"><a href="#线程池-Demo" class="headerlink" title="线程池 Demo"></a>线程池 Demo</h2><p>这里提供一个我写的一个线程池 demo 并不是很完善。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> EventEmitter = <span class="built_in">require</span>(<span class="string">"events"</span>);</span><br><span class="line"><span class="keyword">const</span> &#123; Worker &#125; = <span class="built_in">require</span>(<span class="string">"worker_threads"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 线程状态</span></span><br><span class="line"><span class="keyword">const</span> WorkerStates = &#123;</span><br><span class="line">  TODO: <span class="number">0</span>,</span><br><span class="line">  READY: <span class="number">1</span>,</span><br><span class="line">  DOING: <span class="number">2</span>,</span><br><span class="line">  OFF: <span class="number">3</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 线程池状态</span></span><br><span class="line"><span class="keyword">const</span> WorkerPoolStates = &#123;</span><br><span class="line">  TODO: <span class="number">0</span>,</span><br><span class="line">  READY: <span class="number">1</span>,</span><br><span class="line">  OFF: <span class="number">2</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">SHA256</span> </span>&#123;</span><br><span class="line">  <span class="keyword">constructor</span>() &#123;</span><br><span class="line">    <span class="keyword">this</span>.size = <span class="number">10</span>;</span><br><span class="line">    <span class="keyword">this</span>.workers = [];</span><br><span class="line">    <span class="keyword">this</span>.state = WorkerPoolStates.TODO;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 每次使用线程池都必须运行</span></span><br><span class="line">  <span class="comment">// `await init()` 初始化</span></span><br><span class="line">  init() &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve, reject</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">if</span> (<span class="keyword">this</span>.state == WorkerPoolStates.READY) &#123;</span><br><span class="line">        resolve();</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">let</span> successCount = <span class="number">0</span>;</span><br><span class="line">      <span class="keyword">let</span> failedCount = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">const</span> event = <span class="keyword">new</span> EventEmitter();</span><br><span class="line">      event.on(<span class="string">"spawning"</span>, (isSuccess, ErrorReason) =&gt; &#123;</span><br><span class="line">        <span class="keyword">if</span> (isSuccess) &#123;</span><br><span class="line">          ++successCount;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">          ++failedCount;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 如果所有线程都创建失败，那么直接抛出</span></span><br><span class="line">        <span class="keyword">if</span> (failedCount == <span class="keyword">this</span>.size) &#123;</span><br><span class="line">          <span class="keyword">this</span>.state = WorkerPoolStates.OFF;</span><br><span class="line">          reject(<span class="keyword">new</span> <span class="built_in">Error</span>(ErrorReason));</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 至少一个线程创建成功即可</span></span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span> (successCount != <span class="number">0</span> &amp;&amp; successCount + failedCount == <span class="keyword">this</span>.size) &#123;</span><br><span class="line">          <span class="keyword">this</span>.state = WorkerPoolStates.READY;</span><br><span class="line">          resolve();</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;);</span><br><span class="line"></span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">let</span> i = <span class="number">0</span>; i &lt; <span class="keyword">this</span>.size; ++i) &#123;</span><br><span class="line">        <span class="keyword">const</span> worker = <span class="keyword">new</span> Worker(<span class="string">`<span class="subst">$&#123;__dirname&#125;</span>/worker.js`</span>);</span><br><span class="line">        <span class="keyword">this</span>.workers.push(&#123;</span><br><span class="line">          state: WorkerStates.TODO,</span><br><span class="line">          instance: worker</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 当线程执行代码后悔触发 online 事件</span></span><br><span class="line">        worker.on(</span><br><span class="line">          <span class="string">"online"</span>,</span><br><span class="line">          (<span class="function"><span class="params">index</span> =&gt;</span> () =&gt; &#123;</span><br><span class="line">            <span class="comment">// 线程执行完代码后再更改线程状态</span></span><br><span class="line">            <span class="keyword">this</span>.workers[index].state = WorkerStates.READY;</span><br><span class="line">            <span class="keyword">this</span>.workers[index].instance.removeAllListeners();</span><br><span class="line">            event.emit(<span class="string">"spawning"</span>, <span class="literal">true</span>);</span><br><span class="line">          &#125;)(i)</span><br><span class="line">        );</span><br><span class="line"></span><br><span class="line">        worker.on(</span><br><span class="line">          <span class="string">"error"</span>,</span><br><span class="line">          (<span class="function"><span class="params">index</span> =&gt;</span> ErrorReason =&gt; &#123;</span><br><span class="line">            <span class="keyword">this</span>.workers[index].state = WorkerStates.OFF;</span><br><span class="line">            <span class="keyword">this</span>.workers[index].instance.removeAllListeners();</span><br><span class="line">            event.emit(<span class="string">"spawning"</span>, <span class="literal">false</span>, ErrorReason);</span><br><span class="line">          &#125;)(i)</span><br><span class="line">        );</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  digest(data = <span class="string">""</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve, reject</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">if</span> (<span class="keyword">this</span>.state != WorkerPoolStates.READY) &#123;</span><br><span class="line">        reject(<span class="keyword">new</span> <span class="built_in">Error</span>(<span class="string">"Create threads failed or not ready yet"</span>));</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">let</span> curAvaWorker = <span class="literal">null</span>;</span><br><span class="line">      <span class="keyword">let</span> curAvaWorkerIndex = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">      <span class="comment">// 这里有 bug</span></span><br><span class="line">      <span class="comment">// 如果所有线程都是空闲的返回结果了</span></span><br><span class="line">      <span class="comment">// 处理方式应该使用 promise 进行回调</span></span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">let</span> i = <span class="number">0</span>; i &lt; <span class="keyword">this</span>.size; ++i) &#123;</span><br><span class="line">        <span class="keyword">const</span> curWorker = <span class="keyword">this</span>.workers[i];</span><br><span class="line">        <span class="keyword">if</span> (curWorker.state == WorkerStates.OFF) &#123;</span><br><span class="line">          recreate(i);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (curAvaWorker == <span class="literal">null</span> &amp;&amp; curWorker.state == WorkerStates.READY) &#123;</span><br><span class="line">          curWorker.state = WorkerStates.DOING;</span><br><span class="line">          curAvaWorker = curWorker.instance;</span><br><span class="line">          curAvaWorkerIndex = i;</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      <span class="keyword">if</span> (curAvaWorker == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">      &#125;</span><br><span class="line"></span><br><span class="line">      curAvaWorker.on(<span class="string">"message"</span>, msg =&gt; &#123;</span><br><span class="line">        <span class="keyword">this</span>.free(curAvaWorkerIndex, <span class="literal">false</span>);</span><br><span class="line">        <span class="keyword">if</span> (!msg.error) &#123;</span><br><span class="line">          resolve(msg.data);</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        reject(msg.error);</span><br><span class="line">      &#125;);</span><br><span class="line"></span><br><span class="line">      curAvaWorker.once(<span class="string">"error"</span>, error =&gt; &#123;</span><br><span class="line">        <span class="keyword">this</span>.free(curAvaWorkerIndex, <span class="literal">true</span>);</span><br><span class="line">        reject(error);</span><br><span class="line">      &#125;);</span><br><span class="line"></span><br><span class="line">      curAvaWorker.postMessage(data);</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 重新恢复线程</span></span><br><span class="line">  recreate(i) &#123;</span><br><span class="line">    <span class="keyword">const</span> worker = <span class="keyword">new</span> Worker(<span class="string">`<span class="subst">$&#123;__dirname&#125;</span>/worker.js`</span>);</span><br><span class="line">    <span class="keyword">const</span> deadWorker = <span class="keyword">this</span>.workers[i];</span><br><span class="line">    deadWorker.state = WorkerStates.TODO;</span><br><span class="line">    deadWorker.instance = worker;</span><br><span class="line"></span><br><span class="line">    worker.once(<span class="string">"online"</span>, () =&gt;</span><br><span class="line">      process.nextTick(<span class="function"><span class="params">()</span> =&gt;</span> &#123;</span><br><span class="line">        deadWorker.state = WorkerStates.READY;</span><br><span class="line">        worker.removeAllListeners();</span><br><span class="line">      &#125;)</span><br><span class="line">    );</span><br><span class="line"></span><br><span class="line">    worker.once(<span class="string">"error"</span>, error =&gt; &#123;</span><br><span class="line">      <span class="built_in">console</span>.error(error);</span><br><span class="line">      deadWorker.state = WorkerStates.OFF;</span><br><span class="line">      worker.removeAllListeners();</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 切换线程状态</span></span><br><span class="line">  free(i, hasError) &#123;</span><br><span class="line">    <span class="keyword">this</span>.workers[i].status = hasError ? WorkerStates.READY : WorkerStates.OFF;</span><br><span class="line">    <span class="keyword">this</span>.workers[i].instance.removeAllListeners();</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 停止所有线程</span></span><br><span class="line">  terminate() &#123;</span><br><span class="line">    <span class="keyword">this</span>.state = WorkerPoolStates.OFF;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Promise</span>(<span class="function">(<span class="params">resolve, reject</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">for</span> (<span class="keyword">let</span> i = <span class="number">0</span>; i &lt; <span class="keyword">this</span>.size; ++i) &#123;</span><br><span class="line">        <span class="keyword">this</span>.workers[i].instance.terminate(<span class="function"><span class="params">err</span> =&gt;</span> &#123;</span><br><span class="line">          <span class="keyword">if</span> (!err &amp;&amp; i == <span class="keyword">this</span>.size) &#123;</span><br><span class="line">            resolve();</span><br><span class="line">          &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            reject(err);</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">module</span>.exports = <span class="keyword">new</span> SHA256();</span><br></pre></td></tr></table></figure>
+
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2019/06/29/nodejs/Nodejs-多线程以及线程池教程/ - Nodejs 多线程以及线程池教程 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "Nodejs 多线程以及线程池教程",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>AngularJS Git 提交信息规范 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>AngularJS Git 提交信息规范</h1>
+        
+        <h2 class="headline">Jun 01 2018
+        
+            
+            <a href="/blog/categories/Linux/#Linux">Linux</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><h1 id="目标"><a href="#目标" class="headerlink" title="目标"></a>目标</h1><ul>
+<li>允许通过脚本自动生成变更日志</li>
+<li>允许通过命令过滤某些提交信息（例如不重要的格式变动信息）</li>
+<li>提供更多的历史记录信息</li>
+</ul>
+<h2 id="快速生成变更日志"><a href="#快速生成变更日志" class="headerlink" title="快速生成变更日志"></a>快速生成变更日志</h2><p>我们在变更日志中使用这三个部分：新特性、问题修复（bug fix）、不兼容变更（breaking change）。  </p>
+<p>这些列表可以在发布更新的时候通过脚本生成，并链接到相关的提交记录。  </p>
+<p>当然你可以在发布之前编辑变更日志，不过这种方式能帮助我们生成整体架构。</p>
+<p><strong>列出所有从上一次发布的提交信息的第一行</strong>：  
+<code>&gt;&gt; git log &lt;last tag&gt; HEAD --pretty=format:%s</code></p>
+<p><strong>列出本次发布的新功能</strong>：  
+<code>&gt;&gt; git log &lt;last release&gt; HEAD --grep feature</code></p>
+<h2 id="过滤不重要的提交信息"><a href="#过滤不重要的提交信息" class="headerlink" title="过滤不重要的提交信息"></a>过滤不重要的提交信息</h2><p>这些不重要的信息指的是格式上改变（增加或删除多余的行以及缩进），缺少分号、注释。所以当你在找一些变更的时候可以忽略这些。</p>
+<p>你可以使用这个命令：<br><code>&gt;&gt; git bisect skip $(git rev-list --grep irrelevant &lt;good place&gt; HEAD)</code></p>
+<h2 id="提供更多的历史信息"><a href="#提供更多的历史信息" class="headerlink" title="提供更多的历史信息"></a>提供更多的历史信息</h2><p>看看这些提交信息，一部分来自最近 Angular 的提交，这样的提交信息会增加一种环境信息。</p>
+<ul>
+<li>Fix small typo in docs widget (tutorial instructions)</li>
+<li>Fix test for scenario.Application - should remove old iframe</li>
+<li>docs - various doc fixes</li>
+<li>docs - stripping extra new lines</li>
+<li>Replaced double line break with single when text is fetched from Google</li>
+<li>Added support for properties in documentation</li>
+</ul>
+<p>下面这些信息试图详细描述哪里发生了变化，但没有任何规则…</p>
+<ul>
+<li>fix comment stripping</li>
+<li>fixing broken links</li>
+<li>Bit of refactoring</li>
+<li>Check whether links do exist and throw exception</li>
+<li>Fix sitemap include (to work on case sensitive linux)</li>
+</ul>
+<p>看到这些你能猜出这里面到底有些变化吗？它们都缺少了“特定位置规范”（place specification）…所以使用下面这些词语：docs,docs-parser,compiler,scenario-runner,…</p>
+<p>我知道你能通过查看哪些文件变更来找寻这些信息，但是效率不高。通过使用这些规范来查看 git 的历史提交信息能看到我们所有描述的改动地方。</p>
+<h1 id="格式化提交信息"><a href="#格式化提交信息" class="headerlink" title="格式化提交信息"></a>格式化提交信息</h1><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;</span><br><span class="line">&lt;空一行&gt;</span><br><span class="line">&lt;body&gt;</span><br><span class="line">&lt;空一行&gt;</span><br><span class="line">&lt;footer&gt;</span><br></pre></td></tr></table></figure>
+
+<h2 id="Revert"><a href="#Revert" class="headerlink" title="Revert"></a>Revert</h2><p>如果你使用<code>revert</code>命令，信息头必须以<code>revert:</code>开始，接着在主体信息（body）中必须声明：<code>This reverts commit &lt;hash&gt;.</code>,这里的hash是被 revert 的 commit hash。</p>
+<h2 id="Header"><a href="#Header" class="headerlink" title="Header"></a>Header</h2><p>信息头（Message Header）是一行简洁的变更描述，包括 <code>&lt;type&gt;</code>， 可选 <code>&lt;scope&gt;</code> 以及一个 <code>&lt;subject&gt;</code></p>
+<h3 id="type"><a href="#type" class="headerlink" title="type"></a>type</h3><p>可以使用下面的类型：</p>
+<ul>
+<li>feat​ (新功能)</li>
+<li>fix​ (问题修复)</li>
+<li>docs​ (文档)</li>
+<li>style​ (格式)</li>
+<li>refactor（重构）</li>
+<li>test​ (增加测试)</li>
+<li>chore​ (一些变动)</li>
+</ul>
+<h3 id="scope"><a href="#scope" class="headerlink" title="scope"></a>scope</h3><p>Scope 可以是任何一个具体的变更信息的位置，比如说 $location​,$browser​, $compile​, $rootScope​, ngHref​, ngClick​, ngView​,等等。</p>
+<p>你可以使用 * 来描述不太合适的 scope.</p>
+<h3 id="subject"><a href="#subject" class="headerlink" title="subject"></a>subject</h3><p>这里只要很简洁的描述就可以，不要超过50字。</p>
+<ul>
+<li>使用第一人称现在时</li>
+<li>第一个字母小写</li>
+<li>结尾不加句号</li>
+</ul>
+<h2 id="Body"><a href="#Body" class="headerlink" title="Body"></a>Body</h2><ul>
+<li>使用第一人称现在时</li>
+<li>包括变动的原因和与之前的对比</li>
+</ul>
+<ol>
+<li><a href="http://365git.tumblr.com/post/3308646748/writing-git-commit-messages" target="_blank" rel="noopener">http://365git.tumblr.com/post/3308646748/writing-git-commit-messages</a></li>
+<li><a href="http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html" target="_blank" rel="noopener">http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html</a></li>
+</ol>
+<h2 id="Footer"><a href="#Footer" class="headerlink" title="Footer"></a>Footer</h2><h3 id="不兼容改动"><a href="#不兼容改动" class="headerlink" title="不兼容改动"></a>不兼容改动</h3><p>所有不兼容变更需要放在 footer 上，并且以 <code>BREAKING CHANGE</code>开始，后面是对变更的描述以及理由和迁移方法。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">BREAKING CHANGE: isolate scope bindings definition has changed and</span><br><span class="line">    the inject option for the directive controller injection was removed.</span><br><span class="line">    To migrate the code follow the example below:</span><br><span class="line"></span><br><span class="line">    Before:</span><br><span class="line"></span><br><span class="line">    scope: &#123;</span><br><span class="line">        myAttr: &apos;attribute&apos;,</span><br><span class="line">        myBind: &apos;bind&apos;,</span><br><span class="line">        myExpression: &apos;expression&apos;,</span><br><span class="line">        myEval: &apos;evaluate&apos;,</span><br><span class="line">        myAccessor: &apos;accessor&apos;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    After:</span><br><span class="line"></span><br><span class="line">    scope: &#123;</span><br><span class="line">        myAttr: &apos;@&apos;,</span><br><span class="line">        myBind: &apos;@&apos;,</span><br><span class="line">        myExpression: &apos;&amp;&apos;,</span><br><span class="line">        // myEval - usually not useful, but in cases where the expression is assignable, you can</span><br><span class="line">        use &apos;=&apos;</span><br><span class="line">        myAccessor: &apos;=&apos; // in directive&apos;s template change myAccessor() to myAccessor</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    The removed `inject` wasn&apos;t generaly useful for directives so there should be no code</span><br><span class="line">    using it.</span><br></pre></td></tr></table></figure>
+
+<h3 id="关联issues"><a href="#关联issues" class="headerlink" title="关联issues"></a>关联issues</h3><p>关闭 issues 必须在 footer 区域的分开的一行，以“Closes”关键词开头：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Close #234</span><br></pre></td></tr></table></figure>
+
+<p>当然也可以关闭多个：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Close #123, #245, #992</span><br></pre></td></tr></table></figure>
+
+<h1 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h1><hr>
+<p>feat($browser): onUrlChange event (popstate/hashchange/polling)<br>Added new event to $browser:</p>
+<ul>
+<li>forward popstate event if available</li>
+<li>forward hashchange event if popstate not available</li>
+<li>do polling when neither popstate nor hashchange available<br>Breaks $browser.onHashChange, which was removed (use onUrlChange instead)</li>
+</ul>
+<hr>
+<p>fix($compile): couple of unit tests for IE9</p>
+<p>Older IEs serialize html uppercased, but IE9 does not…<br>Would be better to expect case insensitive, unfortunately jasmine does<br>not allow to user regexps for throw expectations.</p>
+<p>Closes #392<br>Breaks foo.bar api, foo.baz should be used instead</p>
+<hr>
+<p>feat(directive): ng:disabled, ng:checked, ng:multiple, ng:readonly, ng:selected</p>
+<p>New directives for proper binding these attributes in older browsers (IE).<br>Added coresponding description, live examples and e2e tests.</p>
+<p>Closes #351</p>
+<hr>
+<p>docs(guide): updated fixed docs from Google Docs</p>
+<p>Couple of typos fixed:</p>
+<ul>
+<li>indentation</li>
+<li>batchLogbatchLog -&gt; batchLog</li>
+<li>start periodic checking</li>
+<li>missing brace</li>
+</ul>
+<hr>
+<p>feat($compile): simplify isolate scope bindings</p>
+<p>Changed the isolate scope binding options to:</p>
+<ul>
+<li>@attr - attribute binding (including interpolation)</li>
+<li>=model - by-directional model binding</li>
+<li>&amp;expr - expression execution binding</li>
+</ul>
+<p>This change simplifies the terminology as well as<br>number of choices available to the developer. It<br>also supports local name aliasing from the parent.</p>
+<p>BREAKING CHANGE:​ isolate scope bindings definition has changed and<br>the inject option for the directive controller injection was removed.<br>To migrate the code follow the example below:<br>Before:</p>
+<p>scope: {<br>    myAttr: ‘attribute’,<br>    myBind: ‘bind’,<br>    myExpression: ‘expression’,<br>    myEval: ‘evaluate’,<br>    myAccessor: ‘accessor’<br>}</p>
+<p>After:</p>
+<p>scope: {<br>    myAttr: ‘@’,<br>    myBind: ‘@’,<br>    myExpression: ‘&amp;’,<br>    // myEval - usually not useful, but in cases where the expression is assignable, you can use ‘=’<br>    myAccessor: ‘=’ // in directive’s template change myAccessor() to myAccessor<br>}</p>
+<p>The removed <code>inject</code> wasn’t generaly useful for directives so there should be no code using it.</p>
+<p>Refs:</p>
+<ul>
+<li><a href="http://www.ruanyifeng.com/blog/2016/01/commit_message_change_log.html" target="_blank" rel="noopener">阮一峰：Commit message 和 Change log 编写指南</a></li>
+<li><a href="https://docs.google.com/document/export?format=pdf&id=1QrDFcIiPjSLDn3EL15IJygNPiHORgU1_OOAqWjiDU5Y&token=AC4w5VgLbPxZqQd4dFdhThmCmj6QNRkjrw%3A1498265895216" target="_blank" rel="noopener">AngularJS Git Message Conventions</a></li>
+</ul>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2018/06/01/linux/AngularJS-Git-提交信息规范/ - AngularJS Git 提交信息规范 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "AngularJS Git 提交信息规范",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/tool/Win10-Chrome播放视频非常卡顿？/">Win10 Chrome播放视频非常卡顿？</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/database/MySQL-upsert操作/">MySQL upsert操作</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/linux/如果你忘了你的云服务器登录密码/">如果你忘了你的云服务器登录密码</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/最简单的方式使用最新开发分支的Golang编译器/">最简单的方式使用最新开发分支的Golang编译器</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 20 2019</aside>
+    <a href="/blog/2019/08/20/golang/Go-使用-build-tag-来自定义构建配置/">Go: 使用 build tag 来自定义构建配置</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/python/Python模块和包管理/">Python模块和包管理</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/减少-Go-构建文件大小的简单策略/">减少 Go 构建文件大小的简单策略</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Jun 29 2019</aside>
+    <a href="/blog/2019/06/29/golang/Go-无文件引入配置到构建程序/">Go 无文件引入配置到构建程序</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+
