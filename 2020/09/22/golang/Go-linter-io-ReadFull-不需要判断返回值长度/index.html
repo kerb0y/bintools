@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>Go linter: io.ReadFull 不需要判断返回值长度 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>Go linter: io.ReadFull 不需要判断返回值长度</h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/Golang/#Golang">Golang</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>ReadFull 返回从Reader读取的字节数量和错误信息</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ReadFull(r Reader, buf []<span class="keyword">byte</span>) (n <span class="keyword">int</span>, err error)</span><br></pre></td></tr></table></figure>
+
+<p>ReadFull 经常出现在其它辅助函数中，比如随机数生成函数 <code>rand.Read</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> rand</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">"io"</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> Reader io.Reader</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Read</span><span class="params">(b []<span class="keyword">byte</span>)</span> <span class="params">(n <span class="keyword">int</span>, err error)</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> io.ReadFull(Reader, b)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>除了判断 err 是否不为空之外，经常有代码还会判断这个 n 的长度是否和 b 的长度一样，其实这是没必要的，io.ReadFull 内部保证了如果 err == nil 那么 n == len(b)。</p>
+<p>如实现代码所示，如果 Reader 内字节长度小于所需长度那么一定会返回 EOF 错误或者 ErrUnexpectedEOF 错误。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">ReadFull</span><span class="params">(r Reader, buf []<span class="keyword">byte</span>)</span> <span class="params">(n <span class="keyword">int</span>, err error)</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> ReadAtLeast(r, buf, <span class="built_in">len</span>(buf))</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">ReadAtLeast</span><span class="params">(r Reader, buf []<span class="keyword">byte</span>, min <span class="keyword">int</span>)</span> <span class="params">(n <span class="keyword">int</span>, err error)</span></span> &#123;</span><br><span class="line">	<span class="keyword">if</span> <span class="built_in">len</span>(buf) &lt; min &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="number">0</span>, ErrShortBuffer</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">for</span> n &lt; min &amp;&amp; err == <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">var</span> nn <span class="keyword">int</span></span><br><span class="line">		nn, err = r.Read(buf[n:])</span><br><span class="line">		n += nn</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> n &gt;= min &#123;</span><br><span class="line">		err = <span class="literal">nil</span></span><br><span class="line">	&#125; <span class="keyword">else</span> <span class="keyword">if</span> n &gt; <span class="number">0</span> &amp;&amp; err == EOF &#123;</span><br><span class="line">		err = ErrUnexpectedEOF</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用下面实际代码运行来看，确实不需要判断返回长度</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">	<span class="string">"bytes"</span></span><br><span class="line">	<span class="string">"fmt"</span></span><br><span class="line">	<span class="string">"io"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">	<span class="comment">// 无数据 0 EOF</span></span><br><span class="line">	&#123;</span><br><span class="line">		src := bytes.NewReader(<span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">0</span>))</span><br><span class="line">		dsc := <span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">40</span>)</span><br><span class="line">		fmt.Println(io.ReadFull(src, dsc))</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 数据不够 32 unexpected EOF</span></span><br><span class="line">	&#123;</span><br><span class="line">		src := bytes.NewReader(<span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">32</span>))</span><br><span class="line">		dsc := <span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">40</span>)</span><br><span class="line">		fmt.Println(io.ReadFull(src, dsc))</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 数据正好 32 &lt;nil&gt;</span></span><br><span class="line">	&#123;</span><br><span class="line">		src := bytes.NewReader(<span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">32</span>))</span><br><span class="line">		dsc := <span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">32</span>)</span><br><span class="line">		fmt.Println(io.ReadFull(src, dsc))</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 数据更多 32 &lt;nil&gt;</span></span><br><span class="line">	&#123;</span><br><span class="line">		src := bytes.NewReader(<span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">40</span>))</span><br><span class="line">		dsc := <span class="built_in">make</span>([]<span class="keyword">byte</span>, <span class="number">32</span>)</span><br><span class="line">		fmt.Println(io.ReadFull(src, dsc))</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/golang/Go-linter-io-ReadFull-不需要判断返回值长度/ - Go linter: io.ReadFull 不需要判断返回值长度 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "Go linter: io.ReadFull 不需要判断返回值长度",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/获取以太坊交易被Revert的原因/">获取以太坊交易被Revert的原因</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-正确处理-net-包中的错误/">Go: 正确处理 net 包中的错误</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-linter-io-ReadFull-不需要判断返回值长度/">Go linter: io.ReadFull 不需要判断返回值长度</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-处理智能合约转账的安全辅助函数/">solidity 处理智能合约转账的安全辅助函数</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-判断目标地址是否为合约地址的两种方法/">solidity: 判断目标地址是否为合约地址的两种方法</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-按位清除运算符（bit-clear/">Go: 按位清除运算符（bit clear)</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/证书中CommonName和SubjectAlternativeName/">证书中CommonName和SubjectAlternativeName</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/ECMA2020-Optional-Chaining-Nullish-Coalescing/">ECMA2020: Optional Chaining &amp; Nullish Coalescing</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/golang/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

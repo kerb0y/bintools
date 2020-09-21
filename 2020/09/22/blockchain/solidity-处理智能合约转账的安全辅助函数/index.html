@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>solidity 处理智能合约转账的安全辅助函数 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>solidity 处理智能合约转账的安全辅助函数</h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/blockchain/#blockchain">blockchain</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>在智能合约中处理转账，最常见是 Ether 和 ERC20Token 的转账。</p>
+<p>在转账 Ether 时，一般我们直接使用 <code>&lt;address payable&gt;.transfer(uint256)</code>(或者 send) 函数，但是这个函数有个限制，只能使用 2300 gas，而且不能调整，这样就会出现一个问题，如果在合约内转给另一个合约地址，合约内对 fallback 方法做了额外的操作，这样消耗的 gas 就增加，进而交易会被 revert。</p>
+<p>如下所示，如果使用转到下面这个合约，额外带有一个 event 会有额外的 gas 消耗，那么 transfer(send) 固定的 2300 gas 限制一定会失败。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^0.7.0;</span><br><span class="line"></span><br><span class="line">contract Wallet &#123;</span><br><span class="line">    event Deposit( address indexed sender,uint256 indexed amount );</span><br><span class="line"></span><br><span class="line">    receive() payable external &#123;</span><br><span class="line">        emit Deposit(msg.sender, msg.value);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以使用下面函数就行封装，使用 call 方法并指定 value 即可，这样就可以事先调用 rpc 的 eth_estimateGas 接口来动态调整 gas limit。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">function safeTransferETH(address to, uint value) internal &#123;</span><br><span class="line">    (bool success,) = to.call&#123;value:value&#125;(new bytes(0));</span><br><span class="line">    require(success, &apos;ETH_TRANSFER_FAILED&apos;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对于ERC20 的转账，一般我们会使用接口将地址转化合约对象方式来直接调用转账方法。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^0.7.0;</span><br><span class="line"></span><br><span class="line">interface ERC20 &#123;	</span><br><span class="line">    function transfer(address to, uint256 tokens) external returns (bool success);	</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">contract Manager &#123;</span><br><span class="line">    function ERC20Transfer(</span><br><span class="line">        Token _token,</span><br><span class="line">        address _to,</span><br><span class="line">        uint256 _value</span><br><span class="line">    ) public returns (bool) &#123;</span><br><span class="line">        return _token.transfer(_to, _value);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但这有个问题，部分ERC20合约是使用了没有返回值非标准的函数接口，但 Solidity 编译器会把函数调用的返回值进行转换成接口定义的 bool 值，非标准合约调用会造成 revert。</p>
+<p>在旧版本的 ^0.4.22 版本的 solidity 可以使用下面方式检查，代码来源自<a href="https://github.com/sec-bit/badERC20Fix/blob/master/README_CN.md" target="_blank" rel="noopener">sec-bit/badERC20Fix</a></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">function isContract(address addr) internal &#123;</span><br><span class="line">    assembly &#123;</span><br><span class="line">        if iszero(extcodesize(addr)) &#123; revert(0, 0) &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">function handleReturnData() internal returns (bool result) &#123;</span><br><span class="line">    assembly &#123;</span><br><span class="line">        switch returndatasize()</span><br><span class="line">        case 0 &#123; // not a std erc20</span><br><span class="line">            result := 1</span><br><span class="line">        &#125;</span><br><span class="line">        case 32 &#123; // std erc20</span><br><span class="line">            returndatacopy(0, 0, 32)</span><br><span class="line">            result := mload(0)</span><br><span class="line">        &#125;</span><br><span class="line">        default &#123; // anything else, should revert for safety</span><br><span class="line">            revert(0, 0)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">function asmTransfer(address _erc20Addr, address _to, uint256 _value) internal returns (bool result) &#123;</span><br><span class="line">    // Must be a contract addr first!</span><br><span class="line">    isContract(_erc20Addr);  </span><br><span class="line">    // call return false when something wrong</span><br><span class="line">    require(_erc20Addr.call(bytes4(keccak256(&quot;transfer(address,uint256)&quot;)), _to, _value));</span><br><span class="line">    // handle returndata</span><br><span class="line">    return handleReturnData();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当时的 address.call 方法调用只返回是否调用成功，所以需要加入很多汇编代码。但现在 address.call 方法除了返回是否调用成功外，还有了调用返回值。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&lt;address&gt;.call(bytes memory) returns (bool, bytes memory)</span><br></pre></td></tr></table></figure>
+
+<p>所以我们可以更加方便的进行数据判断：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">function safeTransferERC20(address token, address to, uint value) internal &#123;</span><br><span class="line">    // bytes4(keccak256(bytes(&apos;transfer(address,uint256)&apos;)));</span><br><span class="line">    (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));</span><br><span class="line">    // 如果返回值 data 不为空，那么解码为 bool 并判断是否为 true</span><br><span class="line">    require(success &amp;&amp; (data.length == 0 || abi.decode(data, (bool))), &apos;ERC20_TRANSFER_FAILED&apos;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对于 ERC20 这种调用方法，还需要注意一点，低级调用 call 方法，如果地址不是合约那么也会返回 true，所以这里为了安全，最好先保证地址为合约地址。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">modifier OnlyContract(address token) &#123;</span><br><span class="line">     assembly &#123;</span><br><span class="line">         if iszero(extcodesize(token)) &#123;</span><br><span class="line">             revert(0, 0)</span><br><span class="line">         &#125;</span><br><span class="line">     &#125;</span><br><span class="line">    _;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其它 ERC20 方法，类如 transferFrom 以及 approve 方法都可以同上面方式处理。</p>
+<p>需要注意的是，这种处理 ERC20 的几个辅助函数也不是万能的，例如下面代码，transfer 调用了 _transfer() 方法，但是并没有返回值，所以始终会返回 false。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">function _transfer(address _from ,address _to, uint256 _value) internal returns (bool) &#123;</span><br><span class="line">    require(_to != address(0));</span><br><span class="line">    require(_value &lt;= _balances[msg.sender]);</span><br><span class="line"></span><br><span class="line">    _balances[_from] -= _value;</span><br><span class="line">    _balances[_to] += _value;</span><br><span class="line">    emit Transfer(_from, _to, _value);</span><br><span class="line">    return true;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">function transfer(address to, uint value) public returns (bool) &#123;</span><br><span class="line">    _transfer(msg.sender, to, value);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这种不规范的合约还有很多，最简单的处理方式是单独处理特殊合约。</p>
+</section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/blockchain/solidity-处理智能合约转账的安全辅助函数/ - solidity 处理智能合约转账的安全辅助函数 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "solidity 处理智能合约转账的安全辅助函数",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/获取以太坊交易被Revert的原因/">获取以太坊交易被Revert的原因</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-正确处理-net-包中的错误/">Go: 正确处理 net 包中的错误</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-linter-io-ReadFull-不需要判断返回值长度/">Go linter: io.ReadFull 不需要判断返回值长度</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-处理智能合约转账的安全辅助函数/">solidity 处理智能合约转账的安全辅助函数</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-判断目标地址是否为合约地址的两种方法/">solidity: 判断目标地址是否为合约地址的两种方法</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-按位清除运算符（bit-clear/">Go: 按位清除运算符（bit clear)</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/证书中CommonName和SubjectAlternativeName/">证书中CommonName和SubjectAlternativeName</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/ECMA2020-Optional-Chaining-Nullish-Coalescing/">ECMA2020: Optional Chaining &amp; Nullish Coalescing</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/golang/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+

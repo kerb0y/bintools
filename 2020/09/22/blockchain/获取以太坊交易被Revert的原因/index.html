@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
+
+  <meta name="description" content="本博客使用用“保持署名—非商用”创意共享4.0许可证，转载只要保持原作者署名和非商用。">
+
+
+	<meta name="keywords" content="blog">
+
+<link rel="alternate" href="/blog/atom.xml" title="Lishude&#39;s Web Note" type="application/atom+xml">
+<meta name="theme-color" content="#5badf0">
+<title>获取以太坊交易被Revert的原因 - Lishude&#39;s Web Note</title>
+<!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+<link rel="shortcut icon" href="/blog/favicon.png">
+<link rel="stylesheet" href="/blog/css/style.css">
+<nav class="main-nav">
+	
+	    <a href="/blog/">← Home</a>
+	
+	
+	    <a href="/blog/about/">About</a>
+	
+	    <a href="/blog/archives/">Archives</a>
+	
+	<a class="cta" href="/atom.xml" data-no-instant>Subscribe</a>
+</nav>
+
+<section id="wrapper">
+    <article class="post">
+    <header>
+        
+            <h1>获取以太坊交易被Revert的原因</h1>
+        
+        <h2 class="headline">Sep 22 2020
+        
+            
+            <a href="/blog/categories/blockchain/#blockchain">blockchain</a>
+        
+        </h2>
+    </header>
+</article>
+<section id="post-body"><p>Solidity 0.4.22 支持 require 和 revert 函数加上错误原因的字符串，如果交易被Revert将会返回这个字符串，并编码成 <code>Error(string)</code>。</p>
+<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">pragma solidity ^<span class="number">0.6</span><span class="number">.6</span>;</span><br><span class="line"></span><br><span class="line">contract Test &#123;</span><br><span class="line">    <span class="function"><span class="keyword">function</span> <span class="title">test</span>(<span class="params"></span>) <span class="title">public</span> </span>&#123;</span><br><span class="line">        revert(<span class="string">"always failed"</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在测试环境中进行部署后，使用 eth_call 调用：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">	<span class="attr">"id"</span>: <span class="string">"1"</span>,</span><br><span class="line">	<span class="attr">"jsonrpc"</span>: <span class="string">"2.0"</span>,</span><br><span class="line">	<span class="attr">"method"</span>: <span class="string">"eth_call"</span>,</span><br><span class="line">	<span class="attr">"params"</span>: [&#123;</span><br><span class="line">		<span class="attr">"from"</span>: <span class="string">"0xF59fB9ff455c68627bd852d6FEb87Ba73398B9Aa"</span>,</span><br><span class="line">		<span class="attr">"to"</span>: <span class="string">"0x6cC7f0784587DE4c3Da4c74b01707a4d0A3B32a4"</span>,</span><br><span class="line">		<span class="attr">"value"</span>: <span class="string">"0x0"</span>,</span><br><span class="line">		<span class="attr">"gas"</span>: <span class="string">"0x2dc6c0"</span>,</span><br><span class="line">		<span class="attr">"gasPrice"</span>: <span class="string">"0x1"</span>,</span><br><span class="line">		<span class="attr">"data"</span>: <span class="string">"0xf8a8fd6d"</span></span><br><span class="line">	&#125;,<span class="string">"latest"</span>]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>即可获取到返回结果：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">"jsonrpc"</span>: <span class="string">"2.0"</span>,</span><br><span class="line">    <span class="attr">"id"</span>: <span class="string">"1"</span>,</span><br><span class="line">    <span class="attr">"result"</span>: <span class="string">"0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000d616c77617973206661696c656400000000000000000000000000000000000000"</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到返回的结果，是使用 Error 进行了 ABI 编码了，所以可以进行解码。</p>
+<p>使用 Go 进行数据解析，如果所示：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">	<span class="string">"bytes"</span></span><br><span class="line">	<span class="string">"context"</span></span><br><span class="line">	<span class="string">"fmt"</span></span><br><span class="line">	<span class="string">"math/big"</span></span><br><span class="line"></span><br><span class="line">	<span class="string">"github.com/ethereum/go-ethereum"</span></span><br><span class="line">	<span class="string">"github.com/ethereum/go-ethereum/accounts/abi"</span></span><br><span class="line">	<span class="string">"github.com/ethereum/go-ethereum/common"</span></span><br><span class="line">	<span class="string">"github.com/ethereum/go-ethereum/common/hexutil"</span></span><br><span class="line">	<span class="string">"github.com/ethereum/go-ethereum/ethclient"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">	rpcclient, _ := ethclient.Dial(<span class="string">"http://127.0.0.1:8545"</span>)</span><br><span class="line">	contract := common.HexToAddress(<span class="string">"0x6cC7f0784587DE4c3Da4c74b01707a4d0A3B32a4"</span>)</span><br><span class="line">	calldata := ethereum.CallMsg&#123;</span><br><span class="line">		From: common.HexToAddress(<span class="string">"0xF59fB9ff455c68627bd852d6FEb87Ba73398B9Aa"</span>), To: &amp;contract,</span><br><span class="line">		Gas: <span class="number">300</span>_000, GasPrice: big.NewInt(<span class="number">1</span>), Data: hexutil.MustDecode(<span class="string">"0xf8a8fd6d"</span>),</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	result, _ := rpcclient.CallContract(context.Background(), calldata, <span class="literal">nil</span>)</span><br><span class="line">	<span class="comment">// Keccak256("Error(string)")[:4] == "0x08c379a0"</span></span><br><span class="line">	<span class="keyword">if</span> bytes.HasPrefix(result, []<span class="keyword">byte</span>&#123;<span class="number">0x08</span>, <span class="number">0xc3</span>, <span class="number">0x79</span>, <span class="number">0xa0</span>&#125;) &#123;</span><br><span class="line">		strtyp, _ := abi.NewType(<span class="string">"string"</span>, <span class="string">""</span>, <span class="literal">nil</span>)</span><br><span class="line">		<span class="keyword">var</span> errstr <span class="keyword">string</span></span><br><span class="line">		_ = abi.Arguments&#123;&#123;Type: strtyp&#125;&#125;.Unpack(&amp;errstr, result[<span class="number">4</span>:])</span><br><span class="line">		fmt.Println(errstr)</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最终返回 <code>always failed</code>，和预期的情况一致。</p>
+<p>如果要查找历史交易的错误原因，可以在 <code>eth_call</code> 调用时，第二个参数传入交易被确认的高度即可。默认情况下，Geth 客户端仅保存最近的 128 块的信息，如果要获取更久远的交易，那么需要开启 <code>--prune=archive</code>。</p>
+<p>在 go-ethereum 1.9.14 abi 中，原生提供了 revert 解码，升级之后，可以直接使用：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">data, _ := hex.DecodeString(<span class="string">"..."</span>)</span><br><span class="line">reason, _ := abi.UnpackRevert(data)</span><br></pre></td></tr></table></figure>
+
+<p>在 go-ethereum 1.9.15 后，eth_call 调用如果含有 Revert ，那么会直接返回含有错误的信息。在 OpenEthereum(parity) 中很久之前就返回错误了，但是没有给出详细的错误的字符串。</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">"jsonrpc"</span>: <span class="string">"2.0"</span>,</span><br><span class="line">  <span class="attr">"id"</span>: <span class="number">1</span>,</span><br><span class="line">  <span class="attr">"error"</span>: &#123;</span><br><span class="line">    <span class="attr">"code"</span>: <span class="number">3</span>,</span><br><span class="line">    <span class="attr">"message"</span>: <span class="string">"execution reverted: some error"</span>,</span><br><span class="line">    <span class="attr">"data"</span>: <span class="string">"0x08c379a000000000000000000..."</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></section>
+    
+
+    <footer id="post-meta" class="clearfix">
+        <a href="/blog/about/">
+        <img class="avatar" src="/images/avatar.png">
+        <div>
+            <span class="dark">Lishude&#39;s Web Note</span>
+            <span>Node.js/Blockchain/Go</span>
+        </div>
+        </a>
+        <section id="sharing">
+            <a title="Share to Twitter" class="twitter" href="https://twitter.com/intent/tweet?text=https://islishude.github.io/blog/2020/09/22/blockchain/获取以太坊交易被Revert的原因/ - 获取以太坊交易被Revert的原因 @"><span class="icon-twitter">tweet</span></a>
+            <a title="Share to Facebook" class="facebook" href="#" onclick="
+                window.open(
+                  'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(location.href),
+                  'facebook-share-dialog',
+                  'width=626,height=436');
+                return false;"><span class="icon-facebook-sign">Share</span>
+            </a>
+        </section>
+    </footer>
+
+
+  <section id="comment">
+    <button class="btn" id="loadcmts" onclick="cmts.load();">Load Comments</button>
+    <div id="gitment"></div>
+    <script src="/js/gitment.browser.js"></script>
+    <link rel="stylesheet" href>
+    <script>
+      var cmts={
+        load:function cmts(){
+          var gitment = new Gitment({
+          
+            id: "获取以太坊交易被Revert的原因",
+          
+            owner: "",
+            repo: "",
+            oauth: {
+              client_id: "",
+              client_secret: "",
+            },
+          })
+          gitment.render('gitment');
+          var loadcmt = document.getElementById("loadcmts");
+          var imyourfather = loadcmt.parentNode;
+          imyourfather.removeChild(loadcmts)
+        }
+      }
+    </script>
+  </section>
+
+
+    
+        <ul id="post-list" class="archive readmore">
+        <h3>Read more</h3>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/获取以太坊交易被Revert的原因/">获取以太坊交易被Revert的原因</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-正确处理-net-包中的错误/">Go: 正确处理 net 包中的错误</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-linter-io-ReadFull-不需要判断返回值长度/">Go linter: io.ReadFull 不需要判断返回值长度</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-处理智能合约转账的安全辅助函数/">solidity 处理智能合约转账的安全辅助函数</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/blockchain/solidity-判断目标地址是否为合约地址的两种方法/">solidity: 判断目标地址是否为合约地址的两种方法</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/golang/Go-按位清除运算符（bit-clear/">Go: 按位清除运算符（bit clear)</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/linux/证书中CommonName和SubjectAlternativeName/">证书中CommonName和SubjectAlternativeName</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 22 2020</aside>
+    <a href="/blog/2020/09/22/nodejs/ECMA2020-Optional-Chaining-Nullish-Coalescing/">ECMA2020: Optional Chaining &amp; Nullish Coalescing</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Sep 04 2019</aside>
+    <a href="/blog/2019/09/04/golang/Go-显式声明某个类型实现了一个接口/">Go: 显式声明某个类型实现了一个接口</a>
+    <h2></h2>
+</li>
+        
+            <li>
+    <aside class="dates">Aug 27 2019</aside>
+    <a href="/blog/2019/08/27/golang/分享：你可能不知道的Go/">分享：你可能不知道的Go</a>
+    <h2></h2>
+</li>
+        
+        </ul>
+    
+
+	<footer id="footer">
+	<div id="social">
+		<p class="small">© Copyright 2020
+			<a href="/blog/"> islishude </a>/
+			<a href="https://hexo.io"> Hexo </a>/
+			<a href="https://github.com/caisiduo/hexo-theme-lightime"> Lightime</a>
+		</p>
+	</div>
+</footer>
+</section>
+
+	<script src="//cdnjs.loli.net/ajax/libs/instantclick/3.0.1/instantclick.min.js" data-no-instant></script>
+	<script data-no-instant>
+		
+			(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+			(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+			m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+			})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+			ga('create', 'UA-XXXXXXXX-Y', 'auto');
+			ga('send', 'pageview');
+  			InstantClick.on('change', function() {
+  				ga('send', 'pageview', location.pathname + location.search);
+			});
+		
+		InstantClick.init('mousedown');
+	</script>
+
+
+
